@@ -7,8 +7,8 @@
   <title>NOC · ONUs — DATACOM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="{% static 'css/noc.css' %}"/>
-  <script src="../static/script/noc.js"></script>
+  <link rel="stylesheet" type="text/css"  href="{% static 'css/noc.css' %}"/>
+  <script defer src="{% static 'script/noc.js' %}"></script> 
 </head>
 <body>
 {% include "partials/sidebar.html" with active="onus" %}
@@ -41,8 +41,5 @@
     </div>
   </div>
 </main>
-
-<script src="{% static 'js/noc.js' %}"></script>
-<script>document.addEventListener('DOMContentLoaded', () => markActive('onus'));</script>
 </body>
 </html>
