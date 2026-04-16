@@ -1,0 +1,71 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br" class="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NOC · Dashboard — DATACOM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{% static 'css/noc.css' %}"/>
+  <script src="../static/script/noc.js"></script>
+</head>
+<body>
+{% include "partials/sidebar.html" with active="dashboard" %}
+
+<main class="main-content">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-sub">Visão geral da rede — <span id="last-sync" class="mono dim">sincronizando...</span></p>
+    </div>
+    <div class="header-badge">
+      <span class="dot dot--pulse"></span>
+      Auto‑refresh <span class="mono">10s</span>
+    </div>
+  </header>
+
+  <!-- Stats -->
+  <div class="stat-grid">
+    <div class="stat-card stat-card--green">
+      <div class="stat-label">ONUs Online</div>
+      <div class="stat-value" id="dash-online">--</div>
+      <div class="stat-foot"><span class="dot dot--green dot--pulse"></span> Operacional</div>
+    </div>
+    <div class="stat-card stat-card--red">
+      <div class="stat-label">Alertas</div>
+      <div class="stat-value" id="dash-alerts">--</div>
+      <div class="stat-foot">ONUs offline</div>
+    </div>
+    <div class="stat-card stat-card--blue">
+      <div class="stat-label">Status Geral</div>
+      <div class="stat-value" id="dash-status">OK</div>
+      <div class="stat-foot"><span class="dot dot--blue dot--pulse"></span> Todos sistemas normais</div>
+    </div>
+  </div>
+
+  <!-- OLTs -->
+  <section class="section">
+    <div class="section-title">OLTs Monitoradas</div>
+    <div class="olt-grid">
+      {% for olt in olts %}
+      <div class="olt-card">
+        <div class="olt-card__head">
+          <span class="olt-name">{{ olt.name }}</span>
+          <span id="olt-badge-{{ olt.name }}" class="badge badge--unknown">Aguardando</span>
+        </div>
+        <div class="olt-card__body">
+          <div class="kv"><span>Host</span><span class="mono">{{ olt.host }}</span></div>
+          <div class="kv"><span>Porta</span><span class="mono">{{ olt.port }}</span></div>
+          {% if olt.vlan %}<div class="kv"><span>VLAN</span><span class="mono accent">{{ olt.vlan }}</span></div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+</main>
+
+
+</script>
+</body>
+</html>

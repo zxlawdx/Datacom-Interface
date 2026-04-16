@@ -1,0 +1,48 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NOC · ONUs — DATACOM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{% static 'css/noc.css' %}"/>
+  <script src="../static/script/noc.js"></script>
+</head>
+<body>
+{% include "partials/sidebar.html" with active="onus" %}
+
+<main class="main-content">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">ONUs</h1>
+      <p class="page-sub">Status das ONUs por OLT</p>
+    </div>
+  </header>
+
+  <div class="controls-bar">
+    <div class="field-group">
+      <label class="field-label">Selecionar OLT</label>
+      <select id="onu-olt" class="select-input">
+        {% for olt in olts %}<option value="{{ olt.name }}">{{ olt.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <button onclick="loadONUs(event)" class="btn btn--primary">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Carregar ONUs
+    </button>
+  </div>
+
+  <div id="onu-output" class="card-grid">
+    <div class="empty-state col-span-full">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      <p>Selecione uma OLT e clique em Carregar</p>
+    </div>
+  </div>
+</main>
+
+<script src="{% static 'js/noc.js' %}"></script>
+<script>document.addEventListener('DOMContentLoaded', () => markActive('onus'));</script>
+</body>
+</html>

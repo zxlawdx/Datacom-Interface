@@ -1,0 +1,57 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NOC · Terminal — DATACOM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{% static 'css/noc.css' %}"/>
+  <script src="../static/script/noc.js"></script>
+</head>
+<body>
+{% include "partials/sidebar.html" with active="terminal" %}
+
+<main class="main-content">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Terminal</h1>
+      <p class="page-sub">Interface de linha de comando</p>
+    </div>
+    <div class="header-controls">
+      <select id="term-olt" class="select-input select-input--sm" onchange="updateTermLabel()">
+        {% for olt in olts %}<option value="{{ olt.name }}">{{ olt.name }}</option>{% endfor %}
+      </select>
+      <button onclick="clearTerminal()" class="btn btn--ghost btn--sm">Limpar</button>
+    </div>
+  </header>
+
+  <div class="terminal-wrap">
+    <!-- Título estilo macOS -->
+    <div class="terminal-titlebar">
+      <div class="terminal-dots">
+        <span class="tdot tdot--red"></span>
+        <span class="tdot tdot--yellow"></span>
+        <span class="tdot tdot--green"></span>
+      </div>
+      <span id="term-label" class="terminal-label mono">noc@datacom ~ {% for olt in olts %}{% if forloop.first %}{{ olt.name }}{% endif %}{% endfor %}</span>
+    </div>
+
+    <div id="terminal-log" class="terminal-log">
+      <div class="t-line t-line--success">NOC DATACOM Terminal v2.0</div>
+      <div class="t-line t-line--dim">──────────────────────────────────────</div>
+      <div class="t-line">Selecione a OLT e digite o comando...</div>
+    </div>
+
+    <div class="terminal-input-bar">
+      <span class="terminal-prompt">❯</span>
+      <input id="terminal-input" placeholder="Digite o comando..." autocomplete="off" spellcheck="false" class="terminal-input"/>
+    </div>
+  </div>
+  <p class="terminal-hint">Pressione <span class="mono">Enter</span> para enviar — OLT selecionada acima</p>
+</main>
+
+</script>
+</body>
+</html>

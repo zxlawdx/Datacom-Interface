@@ -1,0 +1,47 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NOC · Descobertas — DATACOM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{% static 'css/noc.css' %}"/>
+  <script src="../static/script/noc.js"></script>
+</head>
+<body>
+{% include "partials/sidebar.html" with active="discovered" %}
+
+<main class="main-content">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">ONUs Descobertas</h1>
+      <p class="page-sub">Dispositivos aguardando ativação</p>
+    </div>
+  </header>
+
+  <div class="controls-bar">
+    <div class="field-group">
+      <label class="field-label">Selecionar OLT</label>
+      <select id="disc-olt" class="select-input">
+        {% for olt in olts %}<option value="{{ olt.name }}">{{ olt.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <button onclick="loadDiscovered(event)" class="btn btn--warning">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Buscar ONUs Descobertas
+    </button>
+  </div>
+
+  <div id="disc-output" class="card-grid">
+    <div class="empty-state col-span-full">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <p>Selecione uma OLT e clique em Buscar</p>
+    </div>
+  </div>
+</main>
+
+
+</body>
+</html>

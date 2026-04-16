@@ -1,0 +1,108 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NOC · Ativar ONU — DATACOM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{% static 'css/noc.css' %}"/>
+  <script src="../static/script/noc.js"></script>
+</head>
+<body>
+{% include "partials/sidebar.html" with active="activate" %}
+
+<main class="main-content">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Ativar ONU</h1>
+      <p class="page-sub">Provisionamento de nova ONU na rede</p>
+    </div>
+  </header>
+
+  <div class="split-layout">
+    <!-- Formulário -->
+    <div class="form-panel">
+      <div class="form-section">
+        <div class="form-section__title">OLT de Destino</div>
+        <div class="form-row">
+          <div class="field-group">
+            <label class="field-label">OLT</label>
+            <select id="act-olt" class="select-input" onchange="onActOltChange()">
+              {% for olt in olts %}<option value="{{ olt.name }}">{{ olt.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">PON</label>
+            <input id="act-pon" placeholder="ex: 1/1/4" class="text-input mono-input"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section__title">Dados da ONU</div>
+        <div class="form-row">
+          <div class="field-group">
+            <label class="field-label">ONU ID</label>
+            <input id="act-id" placeholder="ex: 31" type="number" class="text-input"/>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Serial Number</label>
+            <input id="act-serial" placeholder="ex: FHTT06C3C130" class="text-input mono-input" oninput="this.value=this.value.toUpperCase()"/>
+          </div>
+        </div>
+        <div class="field-group" style="margin-top:12px;">
+          <label class="field-label">Nome (use hifens)</label>
+          <input id="act-name" placeholder="ex: base-contrato-endereco-num" class="text-input"/>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section__title">Configuração de Serviço</div>
+        <div class="form-row">
+          <div class="field-group">
+            <label class="field-label">VLAN</label>
+            <input id="act-vlan" placeholder="ex: 306" type="number" class="text-input"/>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Line Profile</label>
+            <input id="act-profile" placeholder="ex: PPPoE-Vlan306" class="text-input mono-input"/>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Service Port</label>
+            <input id="act-service" placeholder="ex: 302" type="number" class="text-input"/>
+          </div>
+        </div>
+        <div id="act-olt-hint" class="olt-hint hidden"></div>
+      </div>
+
+      <button onclick="activateONU(event)" class="btn btn--success btn--full">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Ativar ONU
+      </button>
+      <div id="act-output" class="output-box hidden"></div>
+    </div>
+
+    <!-- Painel lateral -->
+    <div class="side-panel">
+      <div class="side-panel__header">
+        <div>
+          <div class="side-panel__title" style="color:var(--warning)">ONUs Aguardando</div>
+          <div class="side-panel__sub">Clique para preencher o formulário</div>
+        </div>
+        <button onclick="refreshDiscoveredPanel(event)" class="icon-btn" title="Atualizar">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
+      </div>
+      <div id="act-disc-list" class="side-panel__body">
+        <div class="empty-state" style="padding:40px 20px;">
+          <p>Selecione a OLT e clique em atualizar</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</script>
+</body>
+</html>

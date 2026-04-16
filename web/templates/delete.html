@@ -1,0 +1,90 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NOC · Delete ONU — DATACOM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{% static 'css/noc.css' %}"/>
+  <script src="../static/script/noc.js"></script>
+</head>
+<body>
+{% include "partials/sidebar.html" with active="delete" %}
+
+<main class="main-content">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Deletar ONU</h1>
+      <p class="page-sub">Desprovisionamento de ONU da rede</p>
+    </div>
+  </header>
+
+  <div class="split-layout">
+    <!-- Formulário -->
+    <div class="form-panel">
+      <div class="form-section">
+        <div class="form-section__title">OLT de Destino</div>
+        <div class="form-row">
+          <div class="field-group">
+            <label class="field-label">OLT</label>
+            <select id="del-olt" class="select-input">
+              {% for olt in olts %}<option value="{{ olt.name }}">{{ olt.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">PON</label>
+            <input id="del-pon" placeholder="ex: 1/1/4" class="text-input mono-input"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section__title">Dados da ONU</div>
+        <div class="form-row">
+          <div class="field-group">
+            <label class="field-label">ONU ID</label>
+            <input id="del-id" placeholder="ex: 31" type="number" class="text-input"/>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Serial Number</label>
+            <input id="del-serial" placeholder="ex: FHTT06C3C130" class="text-input mono-input" oninput="this.value=this.value.toUpperCase()"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="danger-warning">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Esta ação é irreversível. A ONU será completamente desprovisionada.
+      </div>
+
+      <button onclick="deleteONU(event)" class="btn btn--danger btn--full">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        Deletar ONU
+      </button>
+      <div id="del-output" class="output-box hidden"></div>
+    </div>
+
+    <!-- Painel lateral: ONUs provisionadas -->
+    <div class="side-panel">
+      <div class="side-panel__header">
+        <div>
+          <div class="side-panel__title" style="color:var(--danger)">ONUs Provisionadas</div>
+          <div class="side-panel__sub">Clique para preencher o formulário</div>
+        </div>
+        <button onclick="loadONUsToDelete(event)" class="icon-btn" title="Atualizar">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
+      </div>
+      <div id="del-list" class="side-panel__body">
+        <div class="empty-state" style="padding:40px 20px;">
+          <p>Selecione a OLT e clique em atualizar</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+</body>
+</html>
