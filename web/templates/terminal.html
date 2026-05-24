@@ -1,0 +1,163 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br" class="dark">
+<head>
+  {% include "partials/base_head.html" with title="Terminal" %}
+  <style>
+    .t-line         { padding: 1px 0; line-height: 1.7; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .t-line--success { color: #4edea3; }
+    .t-line--danger  { color: #ffb4ab; }
+    .t-line--dim     { color: #45464d; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .cursor-blink { animation: blink 1s step-end infinite; }
+    #terminal-log::-webkit-scrollbar       { width: 4px; }
+    #terminal-log::-webkit-scrollbar-thumb { background: #2a2d3a; border-radius: 4px; }
+    @media (min-width: 768px) {
+      .noc-sidebar  { display: flex !important; }
+      .noc-main     { margin-left: 16rem; }
+      .noc-header   { width: calc(100% - 16rem); }
+    }
+  </style>
+</head>
+<body class="bg-surface text-text-primary font-sans min-h-screen">
+
+{% include "partials/sidebar.html" with active="terminal" %}
+
+<!-- ── TOPBAR ──────────────────────────────────────────── -->
+<header class="noc-header fixed top-0 right-0 w-full z-40
+               bg-surface-lo/80 backdrop-blur-xl border-b border-border
+               flex items-center justify-between px-6 h-14">
+  <h1 class="font-sans font-black text-accent text-xs uppercase tracking-widest">OLT DATACOM</h1>
+  <div class="flex items-center gap-3">
+    <select id="term-olt" onchange="updateTermLabel()"
+            class="bg-surface-hi border border-border rounded-lg px-3 py-1.5 text-xs
+                   font-mono text-text-primary focus:ring-1 focus:ring-accent outline-none">
+      {% for olt in olts %}<option value="{{ olt.name }}">{{ olt.name }}</option>{% endfor %}
+    </select>
+    <button onclick="clearTerminal()"
+            class="px-3 py-1.5 text-xs font-bold text-text-dim border border-border
+                   rounded-lg hover:text-text-primary hover:bg-surface-hi transition-all">
+      Limpar
+    </button>
+  </div>
+</header>
+
+<!-- ── MAIN ───────────────────────────────────────────── -->
+<main class="noc-main pt-14 pb-20 md:pb-8 min-h-screen flex flex-col">
+  <div class="flex-1 flex flex-col p-6 md:p-8 max-w-7xl mx-auto w-full space-y-5">
+
+    <div>
+      <h2 class="font-bold text-2xl tracking-tight">Terminal</h2>
+      <p class="text-sm text-text-dim mt-0.5">Interface de linha de comando</p>
+    </div>
+
+    <!-- Terminal window -->
+    <div class="flex-1 flex flex-col bg-surface-lowest rounded-xl border border-border overflow-hidden shadow-2xl">
+
+      <!-- Titlebar -->
+      <div class="flex items-center justify-between px-4 py-2.5 bg-surface-mid border-b border-border">
+        <div class="flex items-center gap-3">
+          <div class="flex gap-1.5">
+            <div class="w-2.5 h-2.5 rounded-full bg-danger/50"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-warning/50"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-success/50"></div>
+          </div>
+          <span id="term-label" class="text-[11px] font-mono text-text-dim">
+            noc@datacom ~ {% for olt in olts %}{% if forloop.first %}{{ olt.name }}{% endif %}{% endfor %}
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-success dot-pulse text-success"></span>
+          <span class="text-[10px] font-mono text-success tracking-widest">CONNECTED</span>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div id="terminal-log"
+           class="flex-1 p-5 overflow-y-auto min-h-72 max-h-[55vh] space-y-0.5 bg-surface-lowest">
+        <div class="t-line t-line--success">NOC DATACOM Terminal v3.0</div>
+        <div class="t-line t-line--dim">──────────────────────────────────────</div>
+        <div class="t-line" style="color:#64748b;">Selecione a OLT e digite o comando...</div>
+      </div>
+
+      <!-- Input -->
+      <div class="flex items-center gap-3 px-4 py-3 bg-surface-mid border-t border-border">
+        <span class="text-accent font-mono text-sm font-bold shrink-0">❯</span>
+        <input id="terminal-input"
+               placeholder="Digite o comando..."
+               autocomplete="off" spellcheck="false"
+               class="flex-1 bg-transparent border-none outline-none font-mono text-sm
+                      text-text-primary placeholder:text-text-dim caret-accent"/>
+        <span class="text-[10px] font-mono text-text-dim hidden md:block">Enter para enviar</span>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-surface-mid rounded-xl border border-border p-4">
+        <h3 class="text-[10px] font-bold uppercase tracking-widest text-text-dim mb-3 flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm">history</span> Histórico recente
+        </h3>
+        <div class="space-y-2 font-mono text-[11px] text-text-dim">
+          <div class="hover:text-accent cursor-pointer transition-colors">show interface gpon ...</div>
+          <div class="hover:text-accent cursor-pointer transition-colors">show pppoe sessions ...</div>
+          <div class="hover:text-accent cursor-pointer transition-colors">show running-config ...</div>
+        </div>
+      </div>
+      <div class="bg-surface-mid rounded-xl border border-border p-4">
+        <h3 class="text-[10px] font-bold uppercase tracking-widest text-text-dim mb-3 flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm">flash_on</span> Ações rápidas
+        </h3>
+        <div class="flex flex-wrap gap-2">
+          <button class="text-[10px] bg-surface-highest px-3 py-1.5 rounded border border-border
+                         text-text-primary hover:border-accent hover:text-accent transition-all font-mono">
+            SHOW CPU
+          </button>
+          <button class="text-[10px] bg-surface-highest px-3 py-1.5 rounded border border-border
+                         text-text-primary hover:border-accent hover:text-accent transition-all font-mono">
+            SHOW MEM
+          </button>
+          <button class="text-[10px] bg-surface-highest px-3 py-1.5 rounded border border-border
+                         text-text-primary hover:border-accent hover:text-accent transition-all font-mono">
+            SHOW ONU ALL
+          </button>
+        </div>
+      </div>
+      <div class="bg-surface-mid rounded-xl border border-border p-4">
+        <h3 class="text-[10px] font-bold uppercase tracking-widest text-text-dim mb-3 flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm">info</span> Sistema
+        </h3>
+        <div class="space-y-2 text-[11px]">
+          <div class="flex justify-between">
+            <span class="text-text-dim">Latência</span>
+            <span class="font-mono text-success">14ms</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-text-dim">Sessão</span>
+            <span class="font-mono text-accent">SSH/TCP</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-[10px] text-text-dim text-center">
+      Pressione <span class="font-mono text-accent">Enter</span> para enviar — OLT selecionada no topo
+    </p>
+
+  </div>
+</main>
+
+<script src="{% static 'script/noc/config.js' %}"></script>
+<script src="{% static 'script/noc/ui.js' %}"></script>
+<script src="{% static 'script/noc/parsers.js' %}"></script>
+<script src="{% static 'script/noc/pages.js' %}"></script>
+<script src="{% static 'script/noc.js' %}"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  markActive("terminal");
+  initTerminal();
+  updateTermLabel();
+});
+</script>
+</body>
+</html>

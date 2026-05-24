@@ -1,0 +1,153 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br" class="dark">
+<head>
+  {% include "partials/base_head.html" with title="Dashboard" %}
+</head>
+<body class="bg-surface text-text-primary font-sans min-h-screen">
+
+{% include "partials/sidebar.html" with active="dashboard" %}
+
+<!-- ── TOPBAR ──────────────────────────────────────────── -->
+<header class="fixed top-0 right-0 w-full md:w-[calc(100%-16rem)] z-40
+               bg-surface-lo/80 backdrop-blur-xl border-b border-border
+               flex items-center justify-between px-6 h-14">
+  <div class="flex items-center gap-3">
+    <span class="material-symbols-outlined text-accent text-lg">sensors</span>
+    <h1 class="font-sans font-black text-accent text-xs uppercase tracking-widest">OLT DATACOM — OPERACIONAL</h1>
+  </div>
+  <div class="flex items-center gap-4">
+    <div class="hidden md:flex items-center gap-2 bg-success/10 px-3 py-1 rounded-full border border-success/20">
+      <span class="w-1.5 h-1.5 rounded-full bg-success dot-pulse text-success"></span>
+      <span class="text-[10px] font-bold text-success uppercase tracking-widest">Sistema Normal</span>
+    </div>
+    <span class="text-[10px] text-text-dim font-mono">sync: <span id="last-sync">--:--:--</span></span>
+  </div>
+</header>
+
+<!-- ── MAIN ───────────────────────────────────────────── -->
+<main class="md:ml-64 pt-14 pb-20 md:pb-8 min-h-screen">
+  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
+
+    <!-- Page header -->
+    <div class="flex items-end justify-between">
+      <div>
+        <h2 class="font-sans font-bold text-2xl text-text-primary tracking-tight">Dashboard</h2>
+        <p class="text-sm text-text-dim mt-0.5">Visão geral da rede</p>
+      </div>
+      <span class="text-[10px] text-text-dim font-mono uppercase tracking-widest">Auto‑refresh 60s</span>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <!-- Online -->
+      <div class="bg-surface-mid rounded-xl p-5 border border-border relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-success/5 to-transparent pointer-events-none"></div>
+        <p class="text-[10px] uppercase tracking-widest text-text-dim mb-1">ONUs Online</p>
+        <p class="text-4xl font-bold font-mono text-success" id="dash-online">--</p>
+        <div class="flex items-center gap-2 mt-3">
+          <span class="w-1.5 h-1.5 rounded-full bg-success dot-pulse text-success"></span>
+          <span class="text-[10px] text-text-dim uppercase tracking-wider">Operacional</span>
+        </div>
+      </div>
+      <!-- Alerts -->
+      <div class="bg-surface-mid rounded-xl p-5 border border-border relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-danger/5 to-transparent pointer-events-none"></div>
+        <p class="text-[10px] uppercase tracking-widest text-text-dim mb-1">Alertas</p>
+        <p class="text-4xl font-bold font-mono text-danger" id="dash-alerts">--</p>
+        <div class="flex items-center gap-2 mt-3">
+          <span class="material-symbols-outlined text-danger text-sm">warning</span>
+          <span class="text-[10px] text-text-dim uppercase tracking-wider">ONUs offline</span>
+        </div>
+      </div>
+      <!-- Status -->
+      <div class="bg-surface-mid rounded-xl p-5 border border-border relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent pointer-events-none"></div>
+        <p class="text-[10px] uppercase tracking-widest text-text-dim mb-1">Status Geral</p>
+        <p class="text-4xl font-bold font-mono text-accent" id="dash-status">OK</p>
+        <div class="flex items-center gap-2 mt-3">
+          <span class="w-1.5 h-1.5 rounded-full bg-accent dot-pulse text-accent"></span>
+          <span class="text-[10px] text-text-dim uppercase tracking-wider">Todos sistemas normais</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- OLTs grid -->
+    <section>
+      <h3 class="text-xs font-bold uppercase tracking-widest text-text-dim mb-4">OLTs Monitoradas</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {% for olt in olts %}
+        <div class="bg-surface-mid rounded-xl p-5 border border-border hover:border-accent/30
+                    transition-all duration-200 group">
+          <div class="flex justify-between items-start mb-4">
+            <div class="w-10 h-10 bg-surface-highest rounded-lg flex items-center justify-center">
+              <span class="material-symbols-outlined text-accent">router</span>
+            </div>
+            <span id="olt-badge-{{ olt.name }}"
+                  class="flex items-center gap-1.5 px-2 py-0.5 rounded-full
+                         bg-surface-highest border border-outline text-[10px] font-bold text-text-dim uppercase">
+              Aguardando
+            </span>
+          </div>
+          <h4 class="font-bold text-base text-text-primary tracking-tight mb-0.5">{{ olt.name }}</h4>
+          <p class="text-[11px] font-mono text-text-dim mb-4">{{ olt.host }}:{{ olt.port }}</p>
+
+          <div class="space-y-1.5 text-[11px]">
+            <div class="flex justify-between">
+              <span class="text-text-dim">Host</span>
+              <span class="font-mono text-text-primary">{{ olt.host }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-text-dim">Porta</span>
+              <span class="font-mono text-text-primary">{{ olt.port }}</span>
+            </div>
+            {% if olt.vlan %}
+            <div class="flex justify-between">
+              <span class="text-text-dim">VLAN</span>
+              <span class="font-mono text-accent font-bold">{{ olt.vlan }}</span>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- Telemetry log -->
+    <section>
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs font-bold uppercase tracking-widest text-accent">System Telemetry Log</h3>
+        <span class="text-[10px] font-mono text-text-dim">AUTO-REFRESH: 10S</span>
+      </div>
+      <div class="bg-surface-lowest rounded-xl border border-border overflow-hidden">
+        <div class="bg-surface-mid px-4 py-2 flex items-center gap-2 border-b border-border">
+          <div class="flex gap-1.5">
+            <div class="w-2.5 h-2.5 rounded-full bg-danger/40"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-warning/40"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-success/40"></div>
+          </div>
+          <span class="text-[10px] font-mono text-text-dim ml-2 uppercase tracking-widest">console.log</span>
+        </div>
+        <div id="telem-log" class="p-4 font-mono text-[11px] leading-relaxed max-h-40 overflow-y-auto space-y-1">
+          <p class="text-text-dim">Aguardando dados...</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<script src="{% static 'script/noc/config.js' %}"></script>
+<script src="{% static 'script/noc/ui.js' %}"></script>
+<script src="{% static 'script/noc/parsers.js' %}"></script>
+<script src="{% static 'script/noc/pages.js' %}"></script>
+<script src="{% static 'script/noc.js' %}"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  markActive("dashboard");
+  dashRefresh();
+  setInterval(dashRefresh, 60000);
+});
+</script>
+</body>
+</html>

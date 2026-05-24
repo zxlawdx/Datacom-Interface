@@ -1,0 +1,87 @@
+{% comment %}
+  Partial: base_head.html
+  Inclua no <head> de todos os templates.
+  Uso: {% include "partials/base_head.html" with title="Dashboard" %}
+{% endcomment %}
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NOC · {{ title|default:"DATACOM" }}</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        surface:            "#0b1326",
+        "surface-lo":       "#131b2e",
+        "surface-mid":      "#171f33",
+        "surface-hi":       "#222a3d",
+        "surface-highest":  "#2d3449",
+        "surface-lowest":   "#060e20",
+        border:             "#2a2d3a",
+        outline:            "#45464d",
+        "text-primary":     "#dae2fd",
+        "text-dim":         "#64748b",
+        "text-muted":       "#909097",
+        accent:             "#7bd0ff",
+        "accent-dark":      "#00354a",
+        success:            "#4edea3",
+        "success-dark":     "#003824",
+        warning:            "#ffb95f",
+        "warning-dark":     "#472a00",
+        danger:             "#ffb4ab",
+        "danger-dark":      "#690005",
+      },
+      fontFamily: {
+        sans:  ["Space Grotesk", "sans-serif"],
+        mono:  ["JetBrains Mono", "monospace"],
+      },
+    }
+  }
+}
+</script>
+
+<style>
+  /* Material icons */
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  /* Scrollbar */
+  ::-webkit-scrollbar        { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track  { background: #060e20; }
+  ::-webkit-scrollbar-thumb  { background: #2a2d3a; border-radius: 4px; }
+  /* Pulse dot */
+  @keyframes pulse-dot {
+    0%,100% { box-shadow: 0 0 0 0 currentColor; }
+    50%      { box-shadow: 0 0 0 4px transparent; }
+  }
+  .dot-pulse { animation: pulse-dot 2s infinite; }
+  /* Spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid #2a2d3a;
+    border-top-color: #7bd0ff;
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  /* Toast */
+  .noc-toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px;
+    background: #222a3d; border: 1px solid #2a2d3a;
+    border-radius: 8px; font-size: 12px; color: #dae2fd;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  }
+  .noc-toast--error { border-color: #ffb4ab33; }
+
+  #act-olt-hint:not(.hidden) { display: flex; }
+</style>

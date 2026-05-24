@@ -1,0 +1,112 @@
+{% comment %}
+  Partial: sidebar.html
+  Uso: {% include "partials/sidebar.html" with active="dashboard" %}
+  Valores: dashboard | onus | signal | activate | delete | discovered | terminal
+{% endcomment %}
+{% load static %}
+
+<!-- ── SIDEBAR DESKTOP ─────────────────────────────────── -->
+<aside class="noc-sidebar flex-col fixed left-0 top-0 h-screen w-64 bg-surface-lo border-r border-border z-50">
+
+  <!-- Logo -->
+  <div class="flex items-center gap-3 px-6 py-5 border-b border-border">
+    <span class="material-symbols-outlined text-accent text-2xl">sensors</span>
+    <span class="font-sans font-bold tracking-tighter text-accent text-lg">DATACOM.NOC</span>
+  </div>
+
+  <!-- Nav -->
+  <nav class="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+
+    <a href="{% url 'dashboard' %}"
+       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150
+              {% if active == 'dashboard' %}bg-accent/10 text-accent border-r-2 border-accent
+              {% else %}text-text-muted hover:text-text-primary hover:bg-surface-hi{% endif %}">
+      <span class="material-symbols-outlined text-xl {% if active == 'dashboard' %}text-accent{% else %}text-text-dim{% endif %}">dashboard</span>
+      Dashboard
+    </a>
+
+
+    <a href="{% url 'signal' %}"
+       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150
+              {% if active == 'signal' %}bg-accent/10 text-accent border-r-2 border-accent
+              {% else %}text-text-muted hover:text-text-primary hover:bg-surface-hi{% endif %}">
+      <span class="material-symbols-outlined text-xl {% if active == 'signal' %}text-accent{% else %}text-text-dim{% endif %}">signal_cellular_alt</span>
+      Sinal ONU
+    </a>
+
+    <a href="{% url 'activate' %}"
+       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150
+              {% if active == 'activate' %}bg-accent/10 text-accent border-r-2 border-accent
+              {% else %}text-text-muted hover:text-text-primary hover:bg-surface-hi{% endif %}">
+      <span class="material-symbols-outlined text-xl {% if active == 'activate' %}text-accent{% else %}text-text-dim{% endif %}">add_to_queue</span>
+      Ativar ONU
+    </a>
+
+    <a href="{% url 'delete' %}"
+       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150
+              {% if active == 'delete' %}bg-accent/10 text-accent border-r-2 border-accent
+              {% else %}text-text-muted hover:text-text-primary hover:bg-surface-hi{% endif %}">
+      <span class="material-symbols-outlined text-xl {% if active == 'delete' %}text-accent{% else %}text-text-dim{% endif %}">delete_forever</span>
+      Deletar ONU
+    </a>
+
+    <a href="{% url 'discovered' %}"
+       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150
+              {% if active == 'discovered' %}bg-accent/10 text-accent border-r-2 border-accent
+              {% else %}text-text-muted hover:text-text-primary hover:bg-surface-hi{% endif %}">
+      <span class="material-symbols-outlined text-xl {% if active == 'discovered' %}text-accent{% else %}text-text-dim{% endif %}">radar</span>
+      Descobertas
+    </a>
+
+    <a href="{% url 'terminal' %}"
+       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150
+              {% if active == 'terminal' %}bg-accent/10 text-accent border-r-2 border-accent
+              {% else %}text-text-muted hover:text-text-primary hover:bg-surface-hi{% endif %}">
+      <span class="material-symbols-outlined text-xl {% if active == 'terminal' %}text-accent{% else %}text-text-dim{% endif %}">terminal</span>
+      Terminal
+    </a>
+
+  </nav>
+
+  <!-- User footer -->
+  <div class="px-4 py-4 border-t border-border">
+    <div class="flex items-center gap-3 px-3 py-2 bg-surface-mid rounded-lg">
+      <div class="w-8 h-8 rounded-full bg-surface-highest flex items-center justify-center border border-accent/20">
+        <span class="material-symbols-outlined text-accent text-base">manage_accounts</span>
+      </div>
+      <div>
+        <p class="text-xs font-bold text-accent tracking-widest uppercase">NOC-OPS-01</p>
+        <p class="text-[10px] text-text-dim uppercase tracking-wider">Lead Technician</p>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ── BOTTOM NAV MOBILE ───────────────────────────────── -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-lo/95 backdrop-blur-xl border-t border-border flex items-center justify-around px-2 z-50">
+
+  <a href="{% url 'dashboard' %}"
+     class="flex flex-col items-center gap-0.5 {% if active == 'dashboard' %}text-accent{% else %}text-text-dim{% endif %}">
+    <span class="material-symbols-outlined text-xl">dashboard</span>
+    <span class="text-[9px] uppercase tracking-wider font-bold">Dash</span>
+  </a>
+
+  <a href="{% url 'activate' %}"
+     class="flex flex-col items-center gap-0.5 {% if active == 'activate' %}text-accent{% else %}text-text-dim{% endif %}">
+    <span class="material-symbols-outlined text-xl">add_to_queue</span>
+    <span class="text-[9px] uppercase tracking-wider font-bold">Ativar</span>
+  </a>
+
+  <a href="{% url 'terminal' %}"
+     class="flex flex-col items-center gap-0.5 {% if active == 'terminal' %}text-accent{% else %}text-text-dim{% endif %}">
+    <span class="material-symbols-outlined text-xl">terminal</span>
+    <span class="text-[9px] uppercase tracking-wider font-bold">CLI</span>
+  </a>
+
+  <a href="{% url 'discovered' %}"
+     class="flex flex-col items-center gap-0.5 {% if active == 'discovered' %}text-accent{% else %}text-text-dim{% endif %}">
+    <span class="material-symbols-outlined text-xl">radar</span>
+    <span class="text-[9px] uppercase tracking-wider font-bold">Scan</span>
+  </a>
+
+</nav>

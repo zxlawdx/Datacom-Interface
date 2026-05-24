@@ -1,0 +1,110 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br" class="dark">
+<head>
+  {% include "partials/base_head.html" with title="ONUs Descobertas" %}
+  <style>
+    .onu-card {
+      background: #171f33; border: 1px solid #2a2d3a; border-radius: 10px; padding: 14px;
+    }
+    .onu-card--online  { border-color: #4edea333; }
+    .onu-card--offline { border-color: #ffb4ab33; }
+    .onu-card__head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .onu-id   { font-size: 11px; font-weight: 700; color: #7bd0ff; font-family: 'JetBrains Mono', monospace; }
+    .onu-name { font-size: 10px; color: #64748b; margin-top: 2px; }
+    .onu-card__body { display: flex; flex-direction: column; gap: 4px; }
+    .kv { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+             border-radius: 999px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+    .badge--online  { background: #4edea322; color: #4edea3; border: 1px solid #4edea344; }
+    .badge--offline { background: #ffb4ab22; color: #ffb4ab; border: 1px solid #ffb4ab44; }
+    .badge--unknown { background: #64748b22; color: #64748b; border: 1px solid #64748b44; }
+    .badge--warning { background: #ffb95f22; color: #ffb95f; border: 1px solid #ffb95f44; }
+    .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .dot--green { color: #4edea3; }
+    .dot--red   { color: #ffb4ab; }
+    .dot--gray  { color: #64748b; }
+    .dot--pulse { animation: pulse-dot 2s infinite; }
+    .mono  { font-family: 'JetBrains Mono', monospace; }
+    .accent { color: #7bd0ff; }
+    .disc-card {
+      background: #171f33; border: 1px solid #2a2d3a; border-radius: 10px;
+      padding: 12px; cursor: pointer; transition: border-color .15s;
+    }
+    .disc-card:hover { border-color: #ffb95f; }
+    .loading-state { display: flex; align-items: center; justify-content: center; gap: 10px;
+                     padding: 60px; color: #64748b; font-size: 12px; }
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center;
+                   gap: 10px; padding: 60px 20px; color: #64748b; font-size: 13px; text-align: center; }
+    .col-span-full { grid-column: 1 / -1; }
+    .output-box { font-family: 'JetBrains Mono', monospace; font-size: 11px;
+                  background: #060e20; border: 1px solid #2a2d3a; border-radius: 8px;
+                  padding: 12px; line-height: 1.8; }
+    .btn-spinner { display: inline-block; width: 11px; height: 11px;
+                   border: 1.5px solid #2a2d3a; border-top-color: currentColor;
+                   border-radius: 50%; animation: spin .8s linear infinite; }
+    @media (min-width: 768px) {
+      .noc-sidebar  { display: flex !important; }
+      .noc-main     { margin-left: 16rem; }
+      .noc-header   { width: calc(100% - 16rem); }
+    }
+  </style>
+</head>
+<body class="bg-surface text-text-primary font-sans min-h-screen">
+
+{% include "partials/sidebar.html" with active="discovered" %}
+
+<header class="noc-header fixed top-0 right-0 w-full z-40
+               bg-surface-lo/80 backdrop-blur-xl border-b border-border
+               flex items-center justify-between px-6 h-14">
+  <h1 class="font-sans font-black text-accent text-xs uppercase tracking-widest">OLT DATACOM</h1>
+</header>
+
+<main class="noc-main pt-14 pb-20 md:pb-8 min-h-screen">
+  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+
+    <div>
+      <h2 class="font-bold text-2xl tracking-tight">ONUs Descobertas</h2>
+      <p class="text-sm text-text-dim mt-0.5">Dispositivos aguardando ativação</p>
+    </div>
+
+    <!-- Controls -->
+    <div class="flex flex-wrap items-end gap-3">
+      <div class="flex flex-col gap-1">
+        <label class="text-[10px] uppercase tracking-widest text-text-dim font-bold">Selecionar OLT</label>
+        <select id="disc-olt"
+                class="bg-surface-hi border border-border rounded-lg px-3 py-2 text-sm
+                       font-mono text-text-primary focus:ring-1 focus:ring-accent outline-none">
+          {% for olt in olts %}<option value="{{ olt.name }}">{{ olt.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <button onclick="loadDiscovered(event)"
+              class="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning text-warning-dark
+                     font-bold text-xs uppercase tracking-widest hover:brightness-110
+                     active:scale-95 transition-all">
+        <span class="material-symbols-outlined text-base">radar</span>
+        Buscar ONUs Descobertas
+      </button>
+    </div>
+
+    <!-- Grid — parseONUsToCards() injeta aqui -->
+    <div id="disc-output"
+         class="grid gap-3"
+         style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+      <div class="empty-state col-span-full">
+        <span class="material-symbols-outlined text-4xl text-text-dim">radar</span>
+        <p>Selecione uma OLT e clique em Buscar</p>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script src="{% static 'script/noc/config.js' %}"></script>
+<script src="{% static 'script/noc/ui.js' %}"></script>
+<script src="{% static 'script/noc/parsers.js' %}"></script>
+<script src="{% static 'script/noc/pages.js' %}"></script>
+<script src="{% static 'script/noc.js' %}"></script>
+<script>document.addEventListener('DOMContentLoaded', () => markActive('discovered'));</script>
+</body>
+</html>

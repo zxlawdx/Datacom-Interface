@@ -1,0 +1,3936 @@
+Only in datacom_work/Datacom: .env.example
+Only in datacom_work/Datacom/core: api
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/core/config/olts.py datacom_work/Datacom/core/config/olts.py
+--- orig_datacom/Datacom/core/config/olts.py	2026-04-26 09:32:59.000000000 +0000
++++ datacom_work/Datacom/core/config/olts.py	2026-05-24 05:34:18.441425432 +0000
+@@ -1,43 +1,56 @@
+-OLTS = {
+-    "KM70": {
+-        "host": "10.0.62.200",
+-        "port": 50022,
+-        "user": "[REDACTED]",
+-        "password": "[REDACTED]",
+-        "type": "datacom_km",
+-    },
+-    "KM17": {
+-        "host": "10.0.54.201",
+-        "port": 50022,
+-        "user": "[REDACTED]",
+-        "password": "[REDACTED]",
+-        "type": "datacom_km",
+-    },
+-    "ABUNA": {
+-        "host": "10.0.53.201",
+-        "port": 50022,
+-        "user": "[REDACTED]",
+-        "password": "[REDACTED]",
+-        "type": "datacom_km",
+-    },
+-
+-    
+-    "CALAMA": {
+-        "host": "192.168.230.37",
+-        "port": 22,
+-        "user": "[REDACTED]",
+-        "password": "[REDACTED]",
+-        "type": "datacom_km",
+-        "vlan": 306,
+-        "profile": "PPPoE-Vlan306",
+-    },
+-    "MOANENSE": {
+-        "host": "192.168.230.46",
+-        "port": 22,
+-        "user": "[REDACTED]",
+-        "password": "[REDACTED]",
+-        "type": "datacom_km",
+-        "vlan": 304,
+-        "profile": "PPPoE-Vlan304",
+-    },
+-}
+\ No newline at end of file
++"""Configuração de OLTs baseada em variáveis de ambiente.
++
++Formato suportado em DATACOM_OLTS_JSON:
++{
++  "KM70": {"host":"10.0.0.1", "port":50022, "user":"[REDACTED]", "password":"[REDACTED]", "type":"datacom_km"}
++}
++
++As variáveis específicas DATACOM_OLT_<NOME>_* têm prioridade sobre o JSON.
++"""
++from __future__ import annotations
++
++import json
++import os
++from typing import Any
++
++_DEFAULT_OLTS: dict[str, dict[str, Any]] = {
++    "KM70": {"host": "10.0.62.200", "port": 50022, "user": "", "password": "", "type": "datacom_km"},
++    "KM17": {"host": "10.0.54.201", "port": 50022, "user": "", "password": "", "type": "datacom_km"},
++    "ABUNA": {"host": "10.0.53.201", "port": 50022, "user": "", "password": "", "type": "datacom_km"},
++    "CALAMA": {"host": "192.168.230.37", "port": 22, "user": "", "password": "", "type": "datacom_km", "vlan": 306, "profile": "PPPoE-Vlan306"},
++    "MOANENSE": {"host": "192.168.230.46", "port": 22, "user": "", "password": "", "type": "datacom_km", "vlan": 304, "profile": "PPPoE-Vlan304"},
++}
++
++
++def _env_name(name: str, field: str) -> str:
++    safe = name.upper().replace('-', '_').replace(' ', '_')
++    return f"DATACOM_OLT_{safe}_{field.upper()}"
++
++
++def _load_json_config() -> dict[str, dict[str, Any]]:
++    raw = os.getenv('DATACOM_OLTS_JSON')
++    if not raw:
++        return {}
++    try:
++        data = json.loads(raw)
++    except json.JSONDecodeError as exc:
++        raise RuntimeError('DATACOM_OLTS_JSON inválido') from exc
++    if not isinstance(data, dict):
++        raise RuntimeError('DATACOM_OLTS_JSON deve ser um objeto JSON')
++    return {str(k): dict(v) for k, v in data.items() if isinstance(v, dict)}
++
++
++def _with_env_overrides(base: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
++    merged: dict[str, dict[str, Any]] = {}
++    for name, cfg in base.items():
++        item = dict(cfg)
++        for field in ('host', 'port', 'user', 'password', 'type', 'vlan', 'profile'):
++            value = os.getenv(_env_name(name, field))
++            if value is None:
++                continue
++            item[field] = int(value) if field in {'port', 'vlan'} and value else value
++        merged[name] = item
++    return merged
++
++
++OLTS = _with_env_overrides({**_DEFAULT_OLTS, **_load_json_config()})
+Only in datacom_work/Datacom/core: parsers
+Only in datacom_work/Datacom/core: repositories
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/core/serializers.py datacom_work/Datacom/core/serializers.py
+--- orig_datacom/Datacom/core/serializers.py	2026-04-16 07:03:36.000000000 +0000
++++ datacom_work/Datacom/core/serializers.py	2026-05-24 05:34:18.442349942 +0000
+@@ -1,40 +1,53 @@
+-from rest_framework import serializers
+-
+-
+-class SSHRequestSerializer(serializers.Serializer):
+-    olt = serializers.CharField()
+-
+-
+-class SignalRequestSerializer(serializers.Serializer):
+-    olt = serializers.CharField()
+-    pon = serializers.CharField()
+-    onu_id = serializers.IntegerField()
+-
+-
+-class ActivateONUSerializer(serializers.Serializer):
+-    olt = serializers.CharField()
+-    pon = serializers.CharField()
+-    onu_id = serializers.IntegerField()
+-    serial = serializers.CharField()
+-    name = serializers.CharField()
+-    vlan = serializers.IntegerField()
+-    profile = serializers.CharField()
+-    service_port = serializers.IntegerField()
+-
+-
+-class DeleteONUSerializer(serializers.Serializer):
+-    olt = serializers.CharField()
+-    pon = serializers.CharField()
+-    onu_id = serializers.IntegerField()
+-    service_port = serializers.IntegerField()
+-
+-
+-class ONUDetailRequestSerializer(serializers.Serializer):
+-    olt = serializers.CharField()
+-    pon = serializers.CharField()
+-    onu_id = serializers.IntegerField()
+-
+-
+-class OLTTerminalSerializer(serializers.Serializer):
+-    olt = serializers.CharField()
+-    command = serializers.CharField()
+\ No newline at end of file
++from __future__ import annotations
++
++from rest_framework import serializers
++
++from core.repositories.olt_repository import OLTRepository
++
++
++class OLTNameMixin:
++    def validate_olt(self, value: str) -> str:
++        if not OLTRepository().exists(value):
++            raise serializers.ValidationError(f"OLT '{value}' não encontrada.")
++        return value
++
++
++class SSHRequestSerializer(OLTNameMixin, serializers.Serializer):
++    olt = serializers.CharField(max_length=64)
++
++
++class SignalRequestSerializer(OLTNameMixin, serializers.Serializer):
++    olt = serializers.CharField(max_length=64)
++    pon = serializers.RegexField(regex=r"^\d+/\d+/\d+$", max_length=32)
++    onu_id = serializers.IntegerField(min_value=0, max_value=128)
++
++
++class ActivateONUSerializer(SignalRequestSerializer):
++    serial = serializers.CharField(max_length=64, trim_whitespace=True)
++    name = serializers.CharField(max_length=128, trim_whitespace=True)
++    vlan = serializers.IntegerField(min_value=1, max_value=4094)
++    profile = serializers.CharField(max_length=128, trim_whitespace=True)
++    service_port = serializers.IntegerField(min_value=1)
++
++
++class DeleteONUSerializer(SignalRequestSerializer):
++    service_port = serializers.IntegerField(min_value=1, required=False)
++
++
++class ONUDetailRequestSerializer(SignalRequestSerializer):
++    pass
++
++
++class OLTTerminalSerializer(OLTNameMixin, serializers.Serializer):
++    olt = serializers.CharField(max_length=64)
++    command = serializers.CharField(max_length=512, trim_whitespace=True)
++
++    BLOCKED_PREFIXES = ("reload", "reboot system", "factory-reset", "erase", "format")
++
++    def validate_command(self, value: str) -> str:
++        lowered = value.strip().lower()
++        if not lowered:
++            raise serializers.ValidationError("Comando não pode ser vazio.")
++        if any(lowered.startswith(prefix) for prefix in self.BLOCKED_PREFIXES):
++            raise serializers.ValidationError("Comando bloqueado por segurança.")
++        return value.strip()
+Only in datacom_work/Datacom/core/services: __init__.py
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/core/services/olt_ssh.py datacom_work/Datacom/core/services/olt_ssh.py
+--- orig_datacom/Datacom/core/services/olt_ssh.py	2026-04-22 03:26:54.000000000 +0000
++++ datacom_work/Datacom/core/services/olt_ssh.py	2026-05-24 05:34:18.442055209 +0000
+@@ -1,82 +1,127 @@
+-import time
+-import paramiko
+-from core.config.olts import OLTS
+-
+-_RECV_SIZE    = 65535
+-_CMD_DELAY    = 1.0   # segundos entre comandos curtos
+-_LONG_DELAY   = 3.0   # segundos para comandos que retornam tabelas grandes
+-_DRAIN_ROUNDS = 3     # tentativas extras de leitura após silêncio
+-
+-# Comandos que costumam retornar saídas longas/paginadas
+-_SLOW_COMMANDS = frozenset([
+-    "show interface gpon onu",
+-    "do show interface gpon onu",
+-])
+-
+-
+-def _drain(shell, timeout: float = 1.0) -> str:
+-    """
+-    Lê o buffer do shell até ele ficar silencioso por `timeout` segundos.
+-    Evita cortar output de comandos que retornam tabelas longas.
+-    """
+-    output = ""
+-    deadline = time.time() + timeout
+-    while time.time() < deadline:
+-        if shell.recv_ready():
+-            chunk = shell.recv(_RECV_SIZE).decode("utf-8", errors="replace")
+-            output += chunk
+-            deadline = time.time() + timeout   # reseta o timer a cada chunk
+-        else:
+-            time.sleep(0.1)
+-    return output
+-
+-
+-def run_ssh_simple(host, port, user, password, command: str) -> dict:
+-    client = paramiko.SSHClient()
+-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+-    client.connect(hostname=host, port=port, username=user,
+-                   password=password, timeout=8)
+-
+-    _, stdout, stderr = client.exec_command(command)
+-    output = stdout.read().decode("utf-8", errors="replace")
+-    error  = stderr.read().decode("utf-8", errors="replace")
+-    client.close()
+-    return {"output": output, "error": error}
+-
+-
+-def run_ssh_interactive(host, port, user, password, commands: list) -> dict:
+-    client = paramiko.SSHClient()
+-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+-    client.connect(hostname=host, port=port, username=user, password=password)
+-
+-    shell = client.invoke_shell()
+-    time.sleep(1)
+-    _drain(shell, timeout=1.0)   # descarta o banner de login
+-
+-    output = ""
+-    for cmd in commands:
+-        shell.send(cmd + "\n")
+-        delay = _LONG_DELAY if cmd.strip() in _SLOW_COMMANDS else _CMD_DELAY
+-        output += _drain(shell, timeout=delay)
+-
+-    client.close()
+-    return {"output": output, "error": ""}
+-
+-
+-def run_olt(olt_name: str, commands) -> dict:
+-    olt = OLTS.get(olt_name)
+-    if not olt:
+-        return {"output": "", "error": "OLT não encontrada"}
+-
+-    if isinstance(commands, str):
+-        commands = [commands]
+-
+-    if olt["type"] == "datacom_gc":
+-        return run_ssh_interactive(
+-            olt["host"], olt["port"], olt["user"], olt["password"], commands
+-        )
+-
+-    return run_ssh_simple(
+-        olt["host"], olt["port"], olt["user"], olt["password"],
+-        "\n".join(commands)
+-    )
+\ No newline at end of file
++from __future__ import annotations
++
++import logging
++import os
++import time
++from collections.abc import Sequence
++from dataclasses import dataclass
++
++import paramiko
++
++from core.repositories.olt_repository import OLTRepository, OLTNotFoundError
++
++logger = logging.getLogger(__name__)
++
++_RECV_SIZE = 65535
++_CMD_DELAY = float(os.getenv("DATACOM_SSH_COMMAND_DELAY", "1.0"))
++_LONG_DELAY = float(os.getenv("DATACOM_SSH_LONG_COMMAND_DELAY", "3.0"))
++_CONNECT_TIMEOUT = int(os.getenv("DATACOM_SSH_CONNECT_TIMEOUT", "8"))
++_RETRY_ATTEMPTS = int(os.getenv("DATACOM_SSH_RETRY_ATTEMPTS", "2"))
++_RETRY_BACKOFF = float(os.getenv("DATACOM_SSH_RETRY_BACKOFF", "0.7"))
++
++_SLOW_COMMANDS = frozenset({"show interface gpon onu", "do show interface gpon onu"})
++
++
++@dataclass(frozen=True)
++class CommandResult:
++    output: str = ""
++    error: str = ""
++
++    def as_dict(self) -> dict:
++        return {"output": self.output, "error": self.error}
++
++
++def is_datacom_gc(olt: dict) -> bool:
++    return olt.get("type") == "datacom_gc"
++
++
++def show_commands(olt: dict, commands: str | Sequence[str]) -> list[str]:
++    if isinstance(commands, str):
++        commands = [commands]
++    if not is_datacom_gc(olt):
++        return list(commands)
++    return ["config terminal", *[f"do {command}" for command in commands]]
++
++
++def _drain(shell, timeout: float = 1.0) -> str:
++    output = ""
++    deadline = time.time() + timeout
++    while time.time() < deadline:
++        if shell.recv_ready():
++            output += shell.recv(_RECV_SIZE).decode("utf-8", errors="replace")
++            deadline = time.time() + timeout
++        else:
++            time.sleep(0.1)
++    return output
++
++
++def _with_retry(fn, *, action: str) -> CommandResult:
++    last_exc: Exception | None = None
++    for attempt in range(1, _RETRY_ATTEMPTS + 2):
++        try:
++            return fn()
++        except Exception as exc:  # pragma: no cover - depende de rede real
++            last_exc = exc
++            logger.warning("ssh_attempt_failed", extra={"action": action, "attempt": attempt, "error": str(exc)})
++            if attempt <= _RETRY_ATTEMPTS:
++                time.sleep(_RETRY_BACKOFF * attempt)
++    return CommandResult(error=str(last_exc) if last_exc else "Erro SSH desconhecido")
++
++
++def run_ssh_simple(host: str, port: int, user: str, password: str, command: str) -> dict:
++    def execute() -> CommandResult:
++        client = paramiko.SSHClient()
++        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
++        try:
++            client.connect(hostname=host, port=port, username=user, password=password, timeout=_CONNECT_TIMEOUT)
++            _, stdout, stderr = client.exec_command(command)
++            return CommandResult(
++                output=stdout.read().decode("utf-8", errors="replace"),
++                error=stderr.read().decode("utf-8", errors="replace"),
++            )
++        finally:
++            client.close()
++
++    return _with_retry(execute, action="exec_command").as_dict()
++
++
++def run_ssh_interactive(host: str, port: int, user: str, password: str, commands: Sequence[str]) -> dict:
++    def execute() -> CommandResult:
++        client = paramiko.SSHClient()
++        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
++        try:
++            client.connect(hostname=host, port=port, username=user, password=password, timeout=_CONNECT_TIMEOUT)
++            shell = client.invoke_shell()
++            time.sleep(1)
++            _drain(shell, timeout=1.0)
++            output = ""
++            for command in commands:
++                shell.send(command + "\n")
++                delay = _LONG_DELAY if command.strip() in _SLOW_COMMANDS else _CMD_DELAY
++                output += _drain(shell, timeout=delay)
++            return CommandResult(output=output)
++        finally:
++            client.close()
++
++    return _with_retry(execute, action="invoke_shell").as_dict()
++
++
++def run_olt(olt_name: str, commands: str | Sequence[str]) -> dict:
++    try:
++        olt = OLTRepository().get(olt_name)
++    except OLTNotFoundError as exc:
++        return {"output": "", "error": str(exc)}
++
++    if isinstance(commands, str):
++        commands = [commands]
++
++    if not olt.get("user") or not olt.get("password"):
++        return {"output": "", "error": f"Credenciais da OLT '{olt_name}' não configuradas em variáveis de ambiente."}
++
++    logger.info("olt_command_started", extra={"olt": olt_name, "commands": len(commands)})
++    if is_datacom_gc(olt):
++        result = run_ssh_interactive(olt["host"], int(olt["port"]), olt["user"], olt["password"], list(commands))
++    else:
++        result = run_ssh_simple(olt["host"], int(olt["port"]), olt["user"], olt["password"], "\n".join(commands))
++    logger.info("olt_command_finished", extra={"olt": olt_name, "has_error": bool(result.get("error"))})
++    return result
+Only in datacom_work/Datacom/core/services: onu_service.py
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/core/tests.py datacom_work/Datacom/core/tests.py
+--- orig_datacom/Datacom/core/tests.py	2026-04-16 06:49:48.000000000 +0000
++++ datacom_work/Datacom/core/tests.py	2026-05-24 05:42:07.029181518 +0000
+@@ -1,3 +1,104 @@
+-from django.test import TestCase
+-
+-# Create your tests here.
++from __future__ import annotations
++
++from unittest.mock import patch
++
++from django.contrib.auth.models import User
++from django.test import TestCase
++from rest_framework.test import APIClient
++
++from core.parsers.ipv4_parser import is_real_ipv4, parse_ipv4_info
++from core.parsers.onu_parser import parse_onu_detail, parse_service_info
++from core.repositories.olt_repository import OLTNotFoundError, OLTRepository
++from core.serializers import OLTTerminalSerializer, SignalRequestSerializer
++from core.services.onu_service import ONUService
++
++
++class ParserTests(TestCase):
++    def test_ipv4_real_validation(self):
++        self.assertTrue(is_real_ipv4("192.168.1.10"))
++        self.assertFalse(is_real_ipv4("0.0.0.0"))
++        self.assertFalse(is_real_ipv4("999.1.1.1"))
++        self.assertFalse(is_real_ipv4("not configured"))
++
++    def test_ipv4_parser_pppoe_note(self):
++        parsed = parse_ipv4_info("IPv4 mode : PPPoE\nIPv4 address : 0.0.0.0")
++        self.assertFalse(parsed["configured"])
++        self.assertEqual(parsed["source"], "pppoe_bras")
++
++    def test_onu_detail_parser(self):
++        output = """
++        Serial Number : ABCD12345678
++        Name : CLIENTE_TESTE
++        Operational state : up
++        Rx Optical Power [dBm] : -22.4
++        RSSI [dBm] : -24.1
++        IPv4 mode : static
++        IPv4 address : 10.10.10.2
++        """
++        parsed = parse_onu_detail(output)
++        self.assertEqual(parsed["serial"], "ABCD12345678")
++        self.assertEqual(parsed["status"], "up")
++        self.assertEqual(parsed["rx_power"], "-22.4")
++        self.assertTrue(parsed["ipv4"]["configured"])
++
++    def test_service_info_parser(self):
++        parsed = parse_service_info("service-port 123 vlan-id 304 vlan-id 304", onu_id=1)
++        self.assertEqual(parsed["service_port"], "123")
++        self.assertEqual(parsed["vlans"], ["304"])
++
++
++class RepositoryAndSerializerTests(TestCase):
++    def test_repository_lists_public_olt_fields_without_password(self):
++        item = OLTRepository().list()[0]
++        self.assertIn("name", item)
++        self.assertNotIn("password", item)
++
++    def test_repository_raises_for_unknown_olt(self):
++        with self.assertRaises(OLTNotFoundError):
++            OLTRepository().get("NAO_EXISTE")
++
++    def test_signal_serializer_rejects_invalid_pon(self):
++        serializer = SignalRequestSerializer(data={"olt": "KM70", "pon": "abc", "onu_id": 1})
++        self.assertFalse(serializer.is_valid())
++        self.assertIn("pon", serializer.errors)
++
++    def test_terminal_serializer_blocks_dangerous_commands(self):
++        serializer = OLTTerminalSerializer(data={"olt": "KM70", "command": "reload now"})
++        self.assertFalse(serializer.is_valid())
++        self.assertIn("command", serializer.errors)
++
++
++class ApiTests(TestCase):
++    def setUp(self):
++        self.client = APIClient()
++
++    def test_olts_endpoint_exists(self):
++        response = self.client.get("/core/olts/")
++        self.assertEqual(response.status_code, 200)
++        self.assertIn("results", response.json())
++
++    def test_reboot_requires_authentication(self):
++        response = self.client.post("/core/onu/reboot/", {"olt": "KM70", "pon": "1/1/1", "onu_id": 1}, format="json")
++        self.assertEqual(response.status_code, 403)
++
++    @patch("core.services.onu_service.run_olt")
++    def test_authenticated_reboot_calls_service(self, run_olt):
++        run_olt.return_value = {"output": "ok", "error": ""}
++        User.objects.create_user(username="admin", password="admin12345")
++        self.client.login(username="admin", password="admin12345")
++        response = self.client.post("/core/onu/reboot/", {"olt": "KM70", "pon": "1/1/1", "onu_id": 1}, format="json")
++        self.assertEqual(response.status_code, 200)
++        self.assertEqual(response.json()["output"], "ok")
++
++
++class ServiceTests(TestCase):
++    @patch("core.services.onu_service.run_olt")
++    def test_info_combines_detail_and_service_data(self, run_olt):
++        run_olt.side_effect = [
++            {"output": "Serial Number : ABCD12345678\nOperational state : up", "error": ""},
++            {"output": "RSSI [dBm] : -23.0", "error": ""},
++            {"output": "service-port 900 vlan-id 304", "error": ""},
++        ]
++        result = ONUService().info("KM70", "1/1/1", 1)
++        self.assertEqual(result["detail"]["serial"], "ABCD12345678")
++        self.assertEqual(result["service"]["service_port"], "900")
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/core/urls.py datacom_work/Datacom/core/urls.py
+--- orig_datacom/Datacom/core/urls.py	2026-04-24 05:27:52.000000000 +0000
++++ datacom_work/Datacom/core/urls.py	2026-05-24 05:34:18.442706019 +0000
+@@ -1,31 +1,17 @@
+-# core/urls.py
+-#
+-# Adicione /onu/info/ ao urlpatterns existente.
+-# Os endpoints legados /onu/signal/ e /onu/serviceport/ continuam funcionando.
+-
+-from django.urls import path
+-from . import views
+-
+-urlpatterns = [
+-    # Dashboard / health
+-    path("health/<str:olt_name>/", views.health, name="health"),
+-
+-    # ONU — listagem e discovery
+-    path("onu/status/",     views.onu_status,     name="onu_status"),
+-    path("onu/discovered/", views.onu_discovered,  name="onu_discovered"),
+-
+-    # ONU — detalhes unificados (NOVO — substitui signal + serviceport em 1 request)
+-    path("onu/info/",       views.onu_info,        name="onu_info"),
+-
+-    # ONU — endpoints legados (mantidos por compatibilidade)
+-    path("onu/signal/",     views.onu_signal,      name="onu_signal"),
+-    path("onu/serviceport/",views.onu_serviceport,  name="onu_serviceport"),
+-
+-    # ONU — operações
+-    path("onu/activate/",   views.onu_activate,    name="onu_activate"),
+-    path("onu/delete/",     views.onu_delete,      name="onu_delete"),
+-    path("onu/reboot/",     views.onu_reboot,      name="onu_reboot"),
+-
+-    # Terminal
+-    path("olt/terminal/",   views.olt_terminal,    name="olt_terminal"),
+-]
+\ No newline at end of file
++from django.urls import path
++
++from core.api import views
++
++urlpatterns = [
++    path("olts/", views.olts, name="olts"),
++    path("health/<str:olt_name>/", views.health, name="health"),
++    path("onu/status/", views.onu_status, name="onu_status"),
++    path("onu/discovered/", views.onu_discovered, name="onu_discovered"),
++    path("onu/info/", views.onu_info, name="onu_info"),
++    path("onu/signal/", views.onu_signal, name="onu_signal"),
++    path("onu/serviceport/", views.onu_serviceport, name="onu_serviceport"),
++    path("onu/activate/", views.onu_activate, name="onu_activate"),
++    path("onu/delete/", views.onu_delete, name="onu_delete"),
++    path("onu/reboot/", views.onu_reboot, name="onu_reboot"),
++    path("olt/terminal/", views.olt_terminal, name="olt_terminal"),
++]
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/core/views.py datacom_work/Datacom/core/views.py
+--- orig_datacom/Datacom/core/views.py	2026-04-26 10:12:24.000000000 +0000
++++ datacom_work/Datacom/core/views.py	2026-05-24 05:34:18.442574571 +0000
+@@ -1,605 +1,2 @@
+-"""
+-NOC DATACOM — core/views.py  (refatorado)
+-
+-Melhorias:
+-  - Sem duplicação de código
+-  - Validações centralizadas
+-  - Parsing de saída movido para helpers reutilizáveis
+-  - Endpoint /onu/info/ unificado (sinal + serviceport + PPPoE em paralelo)
+-  - Erros mais descritivos
+-"""
+-
+-import re
+-from concurrent.futures import ThreadPoolExecutor, as_completed
+-
+-from rest_framework.decorators import api_view
+-from rest_framework.response import Response
+-from rest_framework import status
+-
+-from core.services.olt_ssh import run_olt
+-from core.config.olts import OLTS
+-
+-
+-# ─────────────────────────────────────────────────────────────
+-# UTILS INTERNOS
+-# ─────────────────────────────────────────────────────────────
+-
+-def _get_olt(olt_name: str):
+-    """
+-    Retorna (olt_config, None) ou (None, Response 404).
+-    """
+-    olt = OLTS.get(olt_name)
+-    if not olt:
+-        return None, Response(
+-            {"error": f"OLT '{olt_name}' não encontrada."},
+-            status=status.HTTP_404_NOT_FOUND,
+-        )
+-    return olt, None
+-
+-
+-def _is_datacom_gc(olt: dict) -> bool:
+-    return olt.get("type") == "datacom_gc"
+-
+-
+-def _run(olt_name: str, cmds: list) -> dict:
+-    """
+-    Wrapper em torno de run_olt que converte exceções em dicts de erro.
+-    Retorna sempre {"output": str} ou {"error": str}.
+-    """
+-    try:
+-        return run_olt(olt_name, cmds)
+-    except Exception as exc:
+-        return {"error": str(exc)}
+-
+-
+-def _require_fields(data: dict, fields: list):
+-    """
+-    Retorna lista de campos ausentes/vazios.
+-    Aceita 0 como valor válido (ONU ID pode ser 0).
+-    """
+-    return [f for f in fields if data.get(f) is None or data.get(f) == ""]
+-
+-
+-def _gc_show(olt: dict, cmd: str) -> list[str]:
+-    """
+-    Retorna lista de comandos para executar um 'show' em OLTs Datacom GC.
+-    (necessita entrar em conf terminal primeiro)
+-    """
+-    if _is_datacom_gc(olt):
+-        return ["config terminal", f"do {cmd}"]
+-    return [cmd]
+-
+-
+-# ─────────────────────────────────────────────────────────────
+-# PARSERS DE SAÍDA
+-# ─────────────────────────────────────────────────────────────
+-
+-def _parse_service_info(output: str, onu_id: int) -> dict:
+-    """
+-    Extrai service-port, VLANs e sessões PPPoE do output combinado.
+-
+-    Retorna:
+-    {
+-        "service_port": "123" | None,
+-        "vlans": ["100", "200"],
+-        "pppoe_sessions": [
+-            {"session_id": "12345", "mac": "AA:BB:CC:DD:EE:FF"}
+-        ]
+-    }
+-    """
+-    if not output:
+-        return {"service_port": None, "vlans": [], "pppoe_sessions": []}
+-
+-    # service-port
+-    sp_match = re.search(r"service-port\s+(\d+)", output, re.IGNORECASE)
+-    service_port = sp_match.group(1) if sp_match else None
+-
+-    # VLANs (deduplica, preserva ordem)
+-    vlan_matches = re.findall(r"vlan-id\s+(\d+)", output, re.IGNORECASE)
+-    seen = set()
+-    vlans = [v for v in vlan_matches if not (v in seen or seen.add(v))]
+-
+-    # Sessões PPPoE
+-    # Formato típico Datacom: "  1/1/1    5    35633    30:16:9D:0C:CD:0B"
+-    # Filtra pela coluna onu_id (cols[1])
+-    pppoe_sessions = []
+-    for line in output.splitlines():
+-        cols = line.strip().split()
+-        if len(cols) >= 4 and cols[1] == str(onu_id):
+-            mac_candidate = cols[3] if len(cols) > 3 else None
+-            if mac_candidate and re.match(r"([0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}", mac_candidate):
+-                pppoe_sessions.append({
+-                    "session_id": cols[2],
+-                    "mac": mac_candidate.upper(),
+-                })
+-
+-    return {
+-        "service_port": service_port,
+-        "vlans": vlans,
+-        "pppoe_sessions": pppoe_sessions,
+-    }
+-
+-
+-def _is_real_ipv4(value: str | None) -> bool:
+-    """
+-    Retorna True somente se `value` é um endereço IPv4 válido e não-zero.
+-    Rejeita strings vazias, 'N/A', '0.0.0.0', 'Not configured', etc.
+-    """
+-    if not value:
+-        return False
+-    stripped = value.strip()
+-    if not stripped or stripped.lower() in ("n/a", "not configured", "none", "-"):
+-        return False
+-    # Valida padrão x.x.x.x onde cada octeto é 0-255
+-    m = re.fullmatch(r"(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})", stripped)
+-    if not m:
+-        return False
+-    if all(int(g) == 0 for g in m.groups()):
+-        return False          # 0.0.0.0 não é útil
+-    return all(0 <= int(g) <= 255 for g in m.groups())
+-
+-
+-def _parse_ipv4_info(output: str) -> dict:
+-    """
+-    Extrai os campos IPv4 do output de 'show interface gpon {pon} onu {id}'.
+-
+-    Campos lidos da OLT Datacom:
+-        IPv4 mode            : Static | PPPoE | Not configured | ...
+-        IPv4 address         : 192.168.1.100  (ou vazio)
+-        IPv4 default gateway : 192.168.1.1    (ou vazio)
+-        IPv4 VLAN            : 306            (ou vazio)
+-        IPv4 CoS             : 0              (ou vazio)
+-
+-    Retorna:
+-    {
+-        "mode":            "Static" | "PPPoE" | "Not configured" | None,
+-        "address":         "192.168.1.100" | None,
+-        "gateway":         "192.168.1.1"   | None,
+-        "vlan":            "306"           | None,
+-        "cos":             "0"             | None,
+-        "configured":      True | False,   # True = IP real presente na OLT
+-        "source":          "olt" | "pppoe_bras" | "unknown",
+-        "note":            str | None,     # mensagem amigável quando sem IP
+-    }
+-    """
+-    def field(label: str) -> str | None:
+-        m = re.search(rf"{re.escape(label)}\s*:\s*(.+)", output, re.IGNORECASE)
+-        if not m:
+-            return None
+-        val = m.group(1).strip()
+-        return val if val else None
+-
+-    mode    = field("IPv4 mode")
+-    address = field("IPv4 address")
+-    gateway = field("IPv4 default gateway")
+-    vlan    = field("IPv4 VLAN")
+-    cos     = field("IPv4 CoS")
+-
+-    # Normaliza mode
+-    mode_lower = (mode or "").lower()
+-    if not mode or mode_lower in ("not configured", "n/a", "none", "-", ""):
+-        mode = "Not configured"
+-
+-    configured = _is_real_ipv4(address)
+-
+-    # Determina a origem do IP e gera nota amigável
+-    if configured:
+-        source = "olt"
+-        note   = None
+-    elif "pppoe" in mode_lower or "ppp" in mode_lower:
+-        source = "pppoe_bras"
+-        note   = "IP atribuído via PPPoE pelo BRAS — não visível na OLT."
+-    elif mode_lower == "not configured":
+-        source = "unknown"
+-        note   = "Nenhum IP configurado diretamente na OLT. Cliente pode usar PPPoE via BRAS."
+-    else:
+-        source = "unknown"
+-        note   = f"Modo '{mode}' — IP não disponível na OLT."
+-
+-    return {
+-        "mode":       mode,
+-        "address":    address if configured else None,
+-        "gateway":    gateway if _is_real_ipv4(gateway) else None,
+-        "vlan":       vlan    if (vlan and vlan not in ("N/A", "None", "-")) else None,
+-        "cos":        cos     if (cos  and cos  not in ("N/A", "None", "-")) else None,
+-        "configured": configured,
+-        "source":     source,
+-        "note":       note,
+-    }
+-
+-
+-def _parse_onu_detail(output: str) -> dict:
+-    def field(label: str) -> str | None:
+-        m = re.search(rf"{re.escape(label)}\s*:\s*(.+)", output, re.IGNORECASE)
+-        return m.group(1).strip() if m else None
+-
+-    def field_rx(label: str) -> str | None:
+-        m = re.search(
+-            rf"{re.escape(label)}\s*[\[\(]?dBm[\]\)]?\s*:\s*(-?[\d.]+)",
+-            output, re.IGNORECASE
+-        )
+-        return m.group(1) if m else None
+-
+-    rx  = field_rx("Rx Optical Power") or field("Rx Optical Power [dBm]")
+-    tx  = field_rx("Tx Optical Power") or field("Tx Optical Power [dBm]")
+-
+-    # RSS — sinal ONU → OLT  (output de "show ... rss")
+-    rss_m = re.search(r"RSSI\s*\[dBm\]\s*:\s*(-?[\d.]+)", output, re.IGNORECASE)
+-    rss   = rss_m.group(1) if rss_m else None
+-
+-    return {
+-        "serial":     field("Serial Number"),
+-        "name":       field("Name"),
+-        "status":     field("Operational state"),
+-        "uptime":     field("Uptime"),
+-        "vendor":     field("Vendor ID"),
+-        "equipment":  field("Equipment ID"),
+-        "version":    field("Version"),
+-        "active_fw":  field("Active FW"),
+-        "standby_fw": field("Standby FW"),
+-        "profile":    field("Line Profile"),
+-        "distance":   field("Distance"),
+-        "rx_power":   rx,
+-        "tx_power":   tx,
+-        "rss_power":  rss,   # ← novo
+-        "bandwidth":  field("Allocated bandwidth"),
+-        "fec":        field("Upstream-FEC"),
+-        "ipv4":       _parse_ipv4_info(output),
+-    }
+-
+-# ─────────────────────────────────────────────────────────────
+-# HEALTH CHECK
+-# ─────────────────────────────────────────────────────────────
+-
+-@api_view(["GET"])
+-def health(request, olt_name):
+-    olt, err = _get_olt(olt_name)
+-    if err:
+-        return Response({"online": False, "error": err.data["error"]})
+-
+-    cmds = _gc_show(olt, "show version") if _is_datacom_gc(olt) else ["show version"]
+-    result = _run(olt_name, cmds)
+-
+-    if result.get("error"):
+-        return Response({"online": False, "error": result["error"]})
+-    return Response({"online": True})
+-
+-
+-# ─────────────────────────────────────────────────────────────
+-# ONU STATUS — lista geral
+-# ─────────────────────────────────────────────────────────────
+-
+-@api_view(["POST"])
+-def onu_status(request):
+-    olt_name = request.data.get("olt")
+-    olt, err = _get_olt(olt_name)
+-    if err:
+-        return err
+-
+-    cmds = _gc_show(olt, "show interface gpon onu")
+-    return Response(_run(olt_name, cmds))
+-
+-
+-# ─────────────────────────────────────────────────────────────
+-# ONU DISCOVERED
+-# ─────────────────────────────────────────────────────────────
+-
+-@api_view(["POST"])
+-def onu_discovered(request):
+-    olt_name = request.data.get("olt")
+-    olt, err = _get_olt(olt_name)
+-    if err:
+-        return err
+-
+-    cmds = _gc_show(olt, "show interface gpon discovered-onus")
+-    return Response(_run(olt_name, cmds))
+-
+-
+-# ─────────────────────────────────────────────────────────────
+-# ONU INFO — detalhes completos (sinal + serviço + PPPoE)
+-#            substitui /onu/signal/ + /onu/serviceport/ separados
+-# ─────────────────────────────────────────────────────────────
+-
+-@api_view(["POST"])
+-def onu_info(request):
+-    """
+-    Endpoint unificado: busca sinal + service-port + PPPoE em paralelo.
+-
+-    Body: { "olt": "KM70", "pon": "1/1/1", "onu_id": 5 }
+-
+-    Retorna:
+-    {
+-        "detail": { ... campos da ONU ... },
+-        "service": {
+-            "service_port": "123",
+-            "vlans": ["100"],
+-            "pppoe_sessions": [{ "session_id": "...", "mac": "..." }]
+-        },
+-        "raw_detail": "...",
+-        "raw_service": "..."
+-    }
+-    """
+-    d = request.data
+-    missing = _require_fields(d, ["olt", "pon", "onu_id"])
+-    if missing:
+-        return Response(
+-            {"error": f"Campos obrigatórios ausentes: {', '.join(missing)}"},
+-            status=status.HTTP_400_BAD_REQUEST,
+-        )
+-
+-    olt_name = d["olt"]
+-    pon      = d["pon"]
+-    onu_id   = int(d["onu_id"])
+-
+-    olt, err = _get_olt(olt_name)
+-    if err:
+-        return err
+-
+-    cmd_detail  = f"show interface gpon {pon} onu {onu_id}"
+-    cmd_svcport = f'show running-config service-port | context-match "gpon {pon} onu {onu_id}"'
+-    cmd_pppoe   = f"show pppoe intermediate-agent sessions interface gpon {pon}"
+-
+-    # Executa 2 chamadas SSH em paralelo para reduzir latência
+-    def fetch_detail():
+-        out_detail = _run(olt_name, _gc_show(olt, cmd_detail))
+-        out_rss    = _run(olt_name, _gc_show(olt, f"show interface gpon {pon} onu {onu_id} rss"))
+-
+-        # Concatena os dois outputs em um só string
+-        combined = (out_detail.get("output", "") + "\n" + out_rss.get("output", ""))
+-        return {"output": combined, "error": out_detail.get("error") or out_rss.get("error")}
+-    
+-    def fetch_service():
+-        cmds = (
+-            _gc_show(olt, cmd_svcport) + _gc_show(olt, cmd_pppoe)
+-            if _is_datacom_gc(olt)
+-            else [cmd_svcport, cmd_pppoe]
+-        )
+-        return _run(olt_name, cmds)
+-
+-    with ThreadPoolExecutor(max_workers=2) as pool:
+-        fut_detail  = pool.submit(fetch_detail)
+-        fut_service = pool.submit(fetch_service)
+-        raw_detail  = fut_detail.result()
+-        raw_service = fut_service.result()
+-
+-    detail_output  = raw_detail.get("output", "")
+-    service_output = raw_service.get("output", "")
+-
+-    parsed_detail  = _parse_onu_detail(detail_output)
+-    parsed_service = _parse_service_info(service_output, onu_id)
+-
+-    return Response({
+-        "detail":      parsed_detail,
+-        "service":     parsed_service,
+-        "raw_detail":  detail_output,
+-        "raw_service": service_output,
+-        "error":       raw_detail.get("error") or raw_service.get("error"),
+-    })
+-
+-
+-# ─────────────────────────────────────────────────────────────
+-# SIGNAL — mantido por compatibilidade (usa onu_info internamente)
+-# ─────────────────────────────────────────────────────────────
+-
+-@api_view(["POST"])
+-def onu_signal(request):
+-    """
+-    Retorna o output bruto:
+-    - show interface gpon ... onu ...
+-    - show interface gpon ... onu ... rss
+-
+-    O parse será feito no frontend (JS).
+-    """
+-    d = request.data
+-
+-    missing = _require_fields(d, ["olt", "pon", "onu_id"])
+-    if missing:
+-        return Response({
+-            "error": f"Campos ausentes: {', '.join(missing)}"
+-        }, status=400)
+-
+-    olt_name = d["olt"]
+-    olt, err = _get_olt(olt_name)
+-    if err:
+-        return err
+-
+-    pon = d["pon"]
+-    onu_id = int(d["onu_id"])
+-
+-    cmd = [
+-        f"show interface gpon {pon} onu {onu_id}",
+-        f"show interface gpon {pon} onu {onu_id} rss"
+-    ]
+-
+-    raw_output = _run(
+-        olt_name,
+-        _gc_show(olt, cmd)
+-    )
+-
+-    return Response({
+-        "error": "",
+-        "raw_output": raw_output
+-    })
+-
+-# ─────────────────────────────────────────────────────────────
+-# SERVICE PORT — mantido por compatibilidade
+-# ─────────────────────────────────────────────────────────────
+-
+-@api_view(["POST"])
+-def onu_serviceport(request):
+-    d = request.data
+-    missing = _require_fields(d, ["olt", "pon", "onu_id"])
+-    if missing:
+-        return Response({"error": f"Campos ausentes: {', '.join(missing)}"}, status=400)
+-
+-    olt_name = d["olt"]
+-    pon      = d["pon"]
+-    onu_id   = int(d["onu_id"])
+-
+-    olt, err = _get_olt(olt_name)
+-    if err:
+-        return err
+-
+-    cmds = [
+-        f'show running-config service-port | context-match "gpon {pon} onu {onu_id}"',
+-        f"show pppoe intermediate-agent sessions interface gpon {pon}",
+-    ]
+-    if _is_datacom_gc(olt):
+-        cmds = ["config terminal"] + [f"do {c}" for c in cmds]
+-
+-    result = _run(olt_name, cmds)
+-    output = result.get("output", "")
+-
+-    parsed = _parse_service_info(output, onu_id)
+-    return Response({**result, **parsed})
+-
+-
+-# ─────────────────────────────────────────────────────────────
+-# ONU REBOOT
+-# ─────────────────────────────────────────────────────────────
+-
+-@api_view(["POST"])
+-def onu_reboot(request):
+-    d = request.data
+-    missing = _require_fields(d, ["olt", "pon", "onu_id"])
+-    if missing:
+-        return Response({"error": f"Campos ausentes: {', '.join(missing)}"}, status=400)
+-
+-    olt_name = d["olt"]
+-    pon      = d["pon"]
+-    onu_id   = int(d["onu_id"])
+-
+-    olt, err = _get_olt(olt_name)
+-    if err:
+-        return err
+-
+-    cmds = [
+-        "conf terminal",
+-        f"interface gpon {pon}",
+-        f"onu-reset onu {onu_id}",
+-        "top",
+-    ]
+-    return Response(_run(olt_name, cmds))
+-
+-
+-# ─────────────────────────────────────────────────────────────
+-# ONU ACTIVATE
+-# ─────────────────────────────────────────────────────────────
+-
+-@api_view(["POST"])
+-def onu_activate(request):
+-    d = request.data
+-    required = ["olt", "pon", "onu_id", "serial", "name", "vlan", "profile", "service_port"]
+-    missing = _require_fields(d, required)
+-    if missing:
+-        return Response(
+-            {"error": f"Campos obrigatórios ausentes: {', '.join(missing)}"},
+-            status=status.HTTP_400_BAD_REQUEST,
+-        )
+-
+-    olt_name = d["olt"]
+-    _, err = _get_olt(olt_name)
+-    if err:
+-        return err
+-
+-    cmds = [
+-        "config terminal",
+-        f"interface gpon {d['pon']}",
+-        f"onu {d['onu_id']}",
+-        f"name {d['name']}",
+-        f"serial-number {d['serial']}",
+-        f"line-profile {d['profile']}",
+-        "ethernet 1",
+-        "no shutdown",
+-        "negotiation",
+-        f"native vlan vlan-id {d['vlan']}",
+-        "top",
+-        (
+-            f"service-port {d['service_port']} gpon {d['pon']} onu {d['onu_id']} "
+-            f"gem 1 match vlan vlan-id {d['vlan']} action vlan replace vlan-id {d['vlan']}"
+-        ),
+-        "top",
+-        "commit",
+-    ]
+-    return Response(_run(olt_name, cmds))
+-
+-
+-# ─────────────────────────────────────────────────────────────
+-# ONU DELETE
+-# ─────────────────────────────────────────────────────────────
+-
+-@api_view(["POST"])
+-def onu_delete(request):
+-    d = request.data
+-    missing = _require_fields(d, ["olt", "pon", "onu_id"])
+-    if missing:
+-        return Response(
+-            {"error": f"Campos obrigatórios ausentes: {', '.join(missing)}"},
+-            status=status.HTTP_400_BAD_REQUEST,
+-        )
+-
+-    olt_name = d["olt"]
+-    pon      = d["pon"]
+-    onu_id   = int(d["onu_id"])
+-
+-    _, err = _get_olt(olt_name)
+-    if err:
+-        return err
+-
+-    result = _run(olt_name, [
+-        "config terminal",
+-        f"interface gpon {pon}",
+-        f"no onu {onu_id}",
+-        "commit",
+-    ])
+-
+-    # Se OLT bloqueou por service-port existente, remove e tenta novamente
+-    if result.get("output"):
+-        sp_match = re.search(r"Service-port\s+\[(\d+)\]", result["output"])
+-        if sp_match:
+-            result = _run(olt_name, [
+-                "config terminal",
+-                f"no service-port {sp_match.group(1)}",
+-                "commit",
+-                f"interface gpon {pon}",
+-                f"no onu {onu_id}",
+-                "commit",
+-            ])
+-
+-    return Response(result)
+-
+-
+-# ─────────────────────────────────────────────────────────────
+-# TERMINAL
+-# ─────────────────────────────────────────────────────────────
+-
+-# Comandos que rodam direto (sem conf terminal) em Datacom GC
+-_DIRECT_PREFIXES = ("show", "ping", "traceroute", "exit", "end", "top", "do")
+-
+-@api_view(["POST"])
+-def olt_terminal(request):
+-    olt_name = request.data.get("olt")
+-    command  = (request.data.get("command") or "").strip()
+-
+-    if not olt_name or not command:
+-        return Response(
+-            {"error": "Campos 'olt' e 'command' são obrigatórios."},
+-            status=status.HTTP_400_BAD_REQUEST,
+-        )
+-
+-    olt, err = _get_olt(olt_name)
+-    if err:
+-        return err
+-
+-    if _is_datacom_gc(olt):
+-        lower = command.lower()
+-        if lower in ("config terminal", "conf t"):
+-            cmds = ["config terminal"]
+-        elif any(lower.startswith(p) for p in _DIRECT_PREFIXES):
+-            cmds = [command]
+-        else:
+-            cmds = ["config terminal", command]
+-    else:
+-        cmds = [command]
+-
+-    return Response(_run(olt_name, cmds))
+\ No newline at end of file
++"""Compatibilidade: as views de API foram movidas para core.api.views."""
++from core.api.views import *  # noqa: F401,F403
+Only in datacom_work/Datacom/datacom: env.py
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/datacom/settings.py datacom_work/Datacom/datacom/settings.py
+--- orig_datacom/Datacom/datacom/settings.py	2026-04-16 10:32:01.000000000 +0000
++++ datacom_work/Datacom/datacom/settings.py	2026-05-24 05:41:51.503703765 +0000
+@@ -1,130 +1,122 @@
+-"""
+-Django settings for datacom project.
+-
+-Generated by 'django-admin startproject' using Django 6.0.4.
+-
+-For more information on this file, see
+-https://docs.djangoproject.com/en/6.0/topics/settings/
+-
+-For the full list of settings and their values, see
+-https://docs.djangoproject.com/en/6.0/ref/settings/
+-"""
+-import os
+-from pathlib import Path
+-
+-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+-BASE_DIR = Path(__file__).resolve().parent.parent
+-
+-
+-# Quick-start development settings - unsuitable for production
+-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+-
+-# SECURITY WARNING: keep the secret key used in production secret!
+-SECRET_KEY = 'django-insecure-$gyk6#&8u$2=pxcgwu1mu2*$&&ac^ud*jlmm_1d^0+#h#=xswa'
+-
+-# SECURITY WARNING: don't run with debug turned on in production!
+-DEBUG = True
+-
+-ALLOWED_HOSTS = ["*"]
+-
+-
+-# Application definition
+-
+-INSTALLED_APPS = [
+-    'django.contrib.admin',
+-    'django.contrib.auth',
+-    'django.contrib.contenttypes',
+-    'django.contrib.sessions',
+-    'django.contrib.messages',
+-    'django.contrib.staticfiles',
+-    'rest_framework',
+-    'web',
+-    'core',
+-]
+-
+-MIDDLEWARE = [
+-    'django.middleware.security.SecurityMiddleware',
+-    'django.contrib.sessions.middleware.SessionMiddleware',
+-    'django.middleware.common.CommonMiddleware',
+-    'django.middleware.csrf.CsrfViewMiddleware',
+-    'django.contrib.auth.middleware.AuthenticationMiddleware',
+-    'django.contrib.messages.middleware.MessageMiddleware',
+-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+-]
+-
+-ROOT_URLCONF = 'datacom.urls'
+-
+-TEMPLATES = [
+-    {
+-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+-        'DIRS': [
+-            BASE_DIR / 'templates',
+-            BASE_DIR / 'web' / 'templates', # Adicione esta linha explicitamente
+-        ],
+-        'APP_DIRS': True,
+-        'OPTIONS': {
+-            'context_processors': [
+-                'django.template.context_processors.request',
+-                'django.contrib.auth.context_processors.auth',
+-                'django.contrib.messages.context_processors.messages',
+-            ],
+-        },
+-    },
+-]
+-
+-REST_FRAMEWORK = {
+-    'DEFAULT_RENDERER_CLASSES': [
+-        'rest_framework.renderers.JSONRenderer',
+-    ],
+-    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+-}
+-
+-WSGI_APPLICATION = 'datacom.wsgi.application'
+-
+-
+-# Database
+-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+-
+-DATABASES = {
+-    'default': {
+-        'ENGINE': 'django.db.backends.sqlite3',
+-        'NAME': BASE_DIR / 'db.sqlite3',
+-    }
+-}
+-
+-
+-# Password validation
+-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
+-
+-AUTH_PASSWORD_VALIDATORS = [
+-    {
+-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+-    },
+-    {
+-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+-    },
+-    {
+-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+-    },
+-    {
+-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+-    },
+-]
+-
+-
+-# Internationalization
+-# https://docs.djangoproject.com/en/6.0/topics/i18n/
+-
+-LANGUAGE_CODE = 'en-us'
+-
+-TIME_ZONE = 'UTC'
+-
+-USE_I18N = True
+-
+-USE_TZ = True
+-
+-
+-# Static files (CSS, JavaScript, Images)
+-# https://docs.djangoproject.com/en/6.0/howto/static-files/
+-STATIC_URL = '/static/'
+-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
++from __future__ import annotations
++
++import os
++from pathlib import Path
++
++from datacom.env import env_bool, env_list, load_dotenv
++
++BASE_DIR = Path(__file__).resolve().parent.parent
++load_dotenv(BASE_DIR / ".env")
++
++SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-change-me")
++DEBUG = env_bool("DJANGO_DEBUG", True)
++ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["127.0.0.1", "localhost"])
++CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", [])
++
++INSTALLED_APPS = [
++    "django.contrib.admin",
++    "django.contrib.auth",
++    "django.contrib.contenttypes",
++    "django.contrib.sessions",
++    "django.contrib.messages",
++    "django.contrib.staticfiles",
++    "rest_framework",
++    "web",
++    "core",
++]
++
++MIDDLEWARE = [
++    "django.middleware.security.SecurityMiddleware",
++    "django.contrib.sessions.middleware.SessionMiddleware",
++    "django.middleware.common.CommonMiddleware",
++    "django.middleware.csrf.CsrfViewMiddleware",
++    "django.contrib.auth.middleware.AuthenticationMiddleware",
++    "django.contrib.messages.middleware.MessageMiddleware",
++    "django.middleware.clickjacking.XFrameOptionsMiddleware",
++]
++
++ROOT_URLCONF = "datacom.urls"
++
++TEMPLATES = [
++    {
++        "BACKEND": "django.template.backends.django.DjangoTemplates",
++        "DIRS": [BASE_DIR / "templates", BASE_DIR / "web" / "templates"],
++        "APP_DIRS": True,
++        "OPTIONS": {
++            "context_processors": [
++                "django.template.context_processors.request",
++                "django.contrib.auth.context_processors.auth",
++                "django.contrib.messages.context_processors.messages",
++            ],
++        },
++    },
++]
++
++REST_FRAMEWORK = {
++    "DEFAULT_AUTHENTICATION_CLASSES": [
++        "rest_framework.authentication.SessionAuthentication",
++        "rest_framework.authentication.BasicAuthentication",
++    ],
++    "DEFAULT_PERMISSION_CLASSES": [
++        "rest_framework.permissions.AllowAny",
++    ],
++    "DEFAULT_RENDERER_CLASSES": [
++        "rest_framework.renderers.JSONRenderer",
++    ],
++    "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
++}
++
++WSGI_APPLICATION = "datacom.wsgi.application"
++
++DATABASES = {
++    "default": {
++        "ENGINE": "django.db.backends.sqlite3",
++        "NAME": os.getenv("DATABASE_NAME", str(BASE_DIR / "db.sqlite3")),
++    }
++}
++
++AUTH_PASSWORD_VALIDATORS = [
++    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
++    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
++    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
++    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
++]
++
++LANGUAGE_CODE = "pt-br"
++TIME_ZONE = os.getenv("TIME_ZONE", "America/Porto_Velho")
++USE_I18N = True
++USE_TZ = True
++
++STATIC_URL = "/static/"
++STATIC_ROOT = BASE_DIR / "staticfiles"
++STATICFILES_DIRS = [BASE_DIR / "web" / "static"]
++
++DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
++
++SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", not DEBUG)
++CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", not DEBUG)
++SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
++SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "0"))
++SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
++SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
++
++LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO")
++LOGGING = {
++    "version": 1,
++    "disable_existing_loggers": False,
++    "formatters": {
++        "structured": {
++            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
++        },
++    },
++    "handlers": {
++        "console": {
++            "class": "logging.StreamHandler",
++            "formatter": "structured",
++        },
++    },
++    "loggers": {
++        "django": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": True},
++        "core": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
++    },
++}
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/datacom/urls.py datacom_work/Datacom/datacom/urls.py
+--- orig_datacom/Datacom/datacom/urls.py	2026-04-16 09:18:54.000000000 +0000
++++ datacom_work/Datacom/datacom/urls.py	2026-05-24 05:41:51.512936139 +0000
+@@ -1,35 +1,15 @@
+-"""
+-URL configuration for datacom project.
+-
+-The `urlpatterns` list routes URLs to views. For more information please see:
+-    https://docs.djangoproject.com/en/6.0/topics/http/urls/
+-Examples:
+-Function views
+-    1. Add an import:  from my_app import views
+-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
+-Class-based views
+-    1. Add an import:  from other_app.views import Home
+-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
+-Including another URLconf
+-    1. Import the include() function: from django.urls import include, path
+-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+-"""
+-
+-# datacom/urls.py
+-from django.contrib import admin
+-from django.urls import path, include
+-
+-# datacom/urls.py
+-from django.contrib import admin
+-from django.urls import path, include
+-from django.http import HttpResponse
+-
+-def ping(request):
+-    return HttpResponse("URL raiz OK")
+-
+-urlpatterns = [
+-    path('admin/', admin.site.urls),
+-    path('ping/', ping),          # ← view inline, sem depender do web/
+-    path('core/', include('core.urls')),
+-    path('', include('web.urls')),
+-]
+\ No newline at end of file
++from django.contrib import admin
++from django.http import HttpResponse
++from django.urls import include, path
++
++
++def ping(request):
++    return HttpResponse("URL raiz OK")
++
++
++urlpatterns = [
++    path("admin/", admin.site.urls),
++    path("ping/", ping, name="ping"),
++    path("core/", include("core.urls")),
++    path("", include("web.urls")),
++]
+Binary files orig_datacom/Datacom/requirements.txt and datacom_work/Datacom/requirements.txt differ
+Only in datacom_work/Datacom/staticfiles/script: noc
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/staticfiles/script/noc.js datacom_work/Datacom/staticfiles/script/noc.js
+--- orig_datacom/Datacom/staticfiles/script/noc.js	2026-04-26 08:30:12.000000000 +0000
++++ datacom_work/Datacom/staticfiles/script/noc.js	2026-05-24 05:42:17.925992385 +0000
+@@ -1,1098 +1,10 @@
+-/**
+- * NOC DATACOM — noc.js v3.2
+- *
+- * v3.2:
+- *   - Todos os componentes visuais com estilos 100% inline (sem dependência de noc.css)
+- *   - Cards de ONU com layout compacto, tipografia monospace, cores por status
+- *   - Painel de detalhe reescrito com grid 2 colunas para sinais
+- *   - Compatible com Tailwind CDN (sem variáveis CSS)
+- */
+-
+-"use strict";
+-
+-// ─────────────────────────────────────────────────────────────
+-// CONFIG
+-// ─────────────────────────────────────────────────────────────
+-
+-const API = "/core";
+-
+-const OLT_META = {
+-  KM70:     { vlan: null, profile: null,            hint: null },
+-  KM17:     { vlan: null, profile: null,            hint: null },
+-  ABUNA:    { vlan: null, profile: null,            hint: null },
+-  CALAMA:   { vlan: 306,  profile: "PPPoE-Vlan306", hint: "CALAMA — VLAN 306 · PPPoE-Vlan306" },
+-  MOANENSE: { vlan: 304,  profile: "PPPoE-Vlan304", hint: "MOANENSE — VLAN 304 · PPPoE-Vlan304" },
+-};
+-
+-const OLT_LABELS = {
+-  KM70:     "KM70 — 10.0.62.200:50022",
+-  KM17:     "KM17 — 10.0.54.201:50022",
+-  ABUNA:    "ABUNÃ — 10.0.53.201:50022",
+-  CALAMA:   "CALAMA — 192.168.230.37:22",
+-  MOANENSE: "MOANENSE — 192.168.230.46:22",
+-};
+-
+-// ── Paleta de cores
+-const C = {
+-  text:    "#dae2fd",
+-  dim:     "#64748b",
+-  muted:   "#909097",
+-  border:  "#1e2535",
+-  bg:      "#111827",
+-  bgCard:  "#151d2e",
+-  bgLow:   "#0b1120",
+-  accent:  "#7bd0ff",
+-  success: "#4edea3",
+-  warning: "#ffb95f",
+-  danger:  "#ff6b7a",
+-};
+-
+-// ─────────────────────────────────────────────────────────────
+-// ESTILOS INLINE BASE (injetados uma vez no <head>)
+-// ─────────────────────────────────────────────────────────────
+-
+-(function injectBaseStyles() {
+-  if (document.getElementById("noc-base-styles")) return;
+-  const s = document.createElement("style");
+-  s.id = "noc-base-styles";
+-  s.textContent = `
+-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+-
+-    .noc-card {
+-      background: ${C.bgCard};
+-      border: 1px solid ${C.border};
+-      border-radius: 8px;
+-      padding: 10px 12px;
+-      cursor: pointer;
+-      transition: border-color .15s, background .15s, transform .1s;
+-      font-family: 'JetBrains Mono', monospace;
+-      position: relative;
+-      overflow: hidden;
+-    }
+-    .noc-card:hover {
+-      border-color: #2a3550;
+-      background: #1a2238;
+-      transform: translateY(-1px);
+-    }
+-    .noc-card.selected {
+-      border-color: ${C.accent}66 !important;
+-      background: #0d1829 !important;
+-      box-shadow: 0 0 0 1px ${C.accent}22, 0 4px 20px rgba(123,208,255,.08);
+-    }
+-    .noc-card::before {
+-      content: '';
+-      position: absolute;
+-      top: 0; left: 0; right: 0;
+-      height: 2px;
+-      border-radius: 8px 8px 0 0;
+-    }
+-    .noc-card.status-up::before   { background: ${C.success}; }
+-    .noc-card.status-down::before { background: ${C.danger}; }
+-
+-    .noc-kv {
+-      display: flex;
+-      justify-content: space-between;
+-      align-items: center;
+-      padding: 2px 0;
+-    }
+-    .noc-label {
+-      font-size: 9px;
+-      color: ${C.dim};
+-      text-transform: uppercase;
+-      letter-spacing: .05em;
+-      font-weight: 500;
+-    }
+-    .noc-value {
+-      font-size: 10px;
+-      font-weight: 600;
+-      color: ${C.text};
+-      font-family: 'JetBrains Mono', monospace;
+-    }
+-    .noc-badge {
+-      display: inline-flex;
+-      align-items: center;
+-      gap: 4px;
+-      padding: 1px 7px;
+-      border-radius: 999px;
+-      font-size: 9px;
+-      font-weight: 700;
+-      text-transform: uppercase;
+-      letter-spacing: .05em;
+-    }
+-    .noc-dot {
+-      width: 5px; height: 5px;
+-      border-radius: 50%;
+-      display: inline-block;
+-    }
+-
+-    /* loading / empty states */
+-    .noc-loading {
+-      display: flex;
+-      flex-direction: column;
+-      align-items: center;
+-      justify-content: center;
+-      gap: 10px;
+-      padding: 40px;
+-      color: ${C.dim};
+-      font-size: 11px;
+-      font-family: 'JetBrains Mono', monospace;
+-    }
+-    .noc-spinner {
+-      width: 20px; height: 20px;
+-      border: 2px solid ${C.border};
+-      border-top-color: ${C.accent};
+-      border-radius: 50%;
+-      animation: noc-spin .7s linear infinite;
+-    }
+-    @keyframes noc-spin { to { transform: rotate(360deg); } }
+-
+-    .noc-empty {
+-      display: flex;
+-      flex-direction: column;
+-      align-items: center;
+-      justify-content: center;
+-      gap: 8px;
+-      padding: 40px;
+-      color: ${C.dim};
+-      font-size: 11px;
+-      font-family: 'JetBrains Mono', monospace;
+-      text-align: center;
+-    }
+-
+-    /* detail panel rows */
+-    .noc-row {
+-      display: flex;
+-      justify-content: space-between;
+-      align-items: center;
+-      padding: 4px 0;
+-      border-bottom: 1px solid ${C.border};
+-    }
+-    .noc-row:last-child { border-bottom: none; }
+-
+-    /* scrollbar */
+-    ::-webkit-scrollbar { width: 4px; }
+-    ::-webkit-scrollbar-track { background: transparent; }
+-    ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
+-  `;
+-  document.head.appendChild(s);
+-})();
+-
+-// ─────────────────────────────────────────────────────────────
+-// UI HELPERS
+-// ─────────────────────────────────────────────────────────────
+-
+-function markActive(pageKey) {
+-  document.querySelectorAll(".nav-link").forEach(el =>
+-    el.classList.toggle("active", el.dataset.page === pageKey)
+-  );
+-}
+-
+-function showToast(msg, type = "success") {
+-  document.querySelector(".noc-toast")?.remove();
+-  const t = document.createElement("div");
+-  t.className = "noc-toast";
+-  const isErr = type === "error";
+-  t.style.cssText = `
+-    position:fixed;bottom:24px;right:24px;z-index:9999;
+-    display:flex;align-items:center;gap:8px;
+-    padding:10px 16px;
+-    background:#1a2238;
+-    border:1px solid ${isErr ? C.danger + "44" : C.border};
+-    border-radius:8px;font-size:11px;color:${C.text};
+-    box-shadow:0 8px 32px rgba(0,0,0,.6);
+-    font-family:'JetBrains Mono',monospace;
+-    animation: noc-slide-in .2s ease;
+-  `;
+-  const icon = isErr
+-    ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${C.danger}" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`
+-    : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${C.success}" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+-  t.innerHTML = `${icon}<span>${msg}</span>`;
+-  document.body.appendChild(t);
+-  setTimeout(() => {
+-    t.style.transition = "opacity .3s, transform .3s";
+-    t.style.opacity = "0";
+-    t.style.transform = "translateY(6px)";
+-    setTimeout(() => t.remove(), 300);
+-  }, 3000);
+-}
+-
+-function setLoading(btn, loading) {
+-  if (!btn) return;
+-  if (loading) {
+-    btn._prevHtml = btn.innerHTML;
+-    btn.innerHTML = `<span class="noc-spinner" style="width:12px;height:12px;border-width:1.5px;display:inline-block;vertical-align:middle;margin-right:6px;"></span>Carregando...`;
+-    btn.disabled = true;
+-  } else {
+-    if (btn._prevHtml) btn.innerHTML = btn._prevHtml;
+-    btn.disabled = false;
+-  }
+-}
+-
+-function formatOutput(text) {
+-  if (!text?.trim()) return `<span style="color:${C.dim};">Sem retorno do equipamento.</span>`;
+-  return text
+-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+-    .replace(/\n/g, "<br>")
+-    .replace(/(down|fail|error|offline|aborted?)/gi, `<span style="color:${C.danger};font-weight:700;">$1</span>`)
+-    .replace(/(up|online|success|active|complete)/gi, `<span style="color:${C.success};font-weight:700;">$1</span>`)
+-    .replace(/([-\d.]+\s*dBm)/gi, `<span style="color:${C.accent};font-weight:700;">$1</span>`)
+-    .replace(/([A-Z]{4}[0-9A-F]{8,})/g, `<span style="color:${C.warning};font-weight:700;">$1</span>`);
+-}
+-
+-function gridLoading(container, msg = "Carregando...") {
+-  if (!container) return;
+-  container.innerHTML = `<div class="noc-loading" style="grid-column:1/-1;"><span class="noc-spinner"></span><span>${msg}</span></div>`;
+-}
+-
+-function gridError(container, msg) {
+-  if (!container) return;
+-  container.innerHTML = `
+-    <div class="noc-empty" style="grid-column:1/-1;color:${C.danger};">
+-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+-        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/>
+-      </svg>
+-      <span>${msg}</span>
+-    </div>`;
+-}
+-
+-function getSelectedOlt() {
+-  return (
+-    document.getElementById("olt-select")?.value ||
+-    document.getElementById("onu-olt")?.value    ||
+-    document.getElementById("act-olt")?.value    ||
+-    null
+-  );
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// BADGE helpers
+-// ─────────────────────────────────────────────────────────────
+-
+-function statusBadge(status) {
+-  const up = status?.toLowerCase() === "up";
+-  const color = up ? C.success : C.danger;
+-  return `
+-    <span class="noc-badge" style="color:${color};background:${color}18;border:1px solid ${color}33;">
+-      <span class="noc-dot" style="background:${color};${up ? `box-shadow:0 0 4px ${color}88;` : ""}"></span>
+-      ${status ?? "?"}
+-    </span>`;
+-}
+-
+-function dbmColor(val) {
+-  const v = parseFloat(val);
+-  return isNaN(v) ? C.dim : v >= -25 ? C.success : v >= -28 ? C.warning : C.danger;
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// ONU CARD PARSER  (lista geral)
+-// ─────────────────────────────────────────────────────────────
+-
+-function parseOLTToCards(html, container) {
+-  if (!container) return;
+-  container.innerHTML = "";
+-
+-  const sinalEl = document.getElementById("onu-sinal");
+-  if (sinalEl) { sinalEl.textContent = "--"; sinalEl.style.color = ""; }
+-
+-  const clean = html.replace(/<br>/g, "\n").replace(/<[^>]+>/g, "");
+-  const dataLines = clean.split("\n").slice(2).filter(l => l.trim());
+-
+-  if (!dataLines.length) {
+-    container.innerHTML = `<div class="noc-empty" style="grid-column:1/-1;"><p>Nenhuma ONU encontrada</p></div>`;
+-    return;
+-  }
+-
+-  dataLines.forEach(line => {
+-    const parts = line.trim().split(/\s+/);
+-    if (parts.length < 4) return;
+-
+-    const onu = {
+-      pon:    parts[0],
+-      id:     parts[1],
+-      serial: parts[2],
+-      status: parts[3],
+-      name:   parts.slice(5).join(" ") || "",
+-    };
+-
+-    const isUp = onu.status.toLowerCase() === "up";
+-    const card = document.createElement("div");
+-    card.className = `noc-card status-${isUp ? "up" : "down"}`;
+-    card.setAttribute("role", "button");
+-    card.setAttribute("tabindex", "0");
+-    card.dataset.onuId  = onu.id;
+-    card.dataset.onuPon = onu.pon;
+-
+-    card.innerHTML = `
+-      <div class="noc-kv" style="margin-bottom:6px;">
+-        <div style="display:flex;align-items:center;gap:6px;">
+-          <span style="font-size:9px;color:${C.dim};text-transform:uppercase;">PON</span>
+-          <span style="font-size:10px;color:${C.accent};font-weight:700;">${onu.pon}</span>
+-          <span style="font-size:9px;color:${C.dim};">·</span>
+-          <span style="font-size:9px;color:${C.dim};">ID</span>
+-          <span style="font-size:10px;color:${C.text};">${onu.id}</span>
+-        </div>
+-        ${statusBadge(onu.status)}
+-      </div>
+-
+-      <div style="font-size:11px;font-weight:700;color:${C.warning};
+-                  letter-spacing:.03em;margin-bottom:${onu.name ? "4px" : "0"};">
+-        ${onu.serial}
+-      </div>
+-
+-      ${onu.name ? `
+-        <div style="font-size:9px;color:${C.success};
+-                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+-                    padding-top:4px;border-top:1px solid ${C.border};margin-top:4px;">
+-          ${onu.name}
+-        </div>` : ""}
+-    `;
+-
+-    const activate = () => {
+-      document.querySelectorAll("#onu-output .noc-card").forEach(c => c.classList.remove("selected"));
+-      card.classList.add("selected");
+-      getSignal(getSelectedOlt(), onu.pon, onu.id);
+-    };
+-    card.addEventListener("click", activate);
+-    card.addEventListener("keydown", e => {
+-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); }
+-    });
+-
+-    container.appendChild(card);
+-  });
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// DISCOVERED PANEL PARSER
+-// ─────────────────────────────────────────────────────────────
+-
+-function parseDiscoveredToPanel(text, container, oltName) {
+-  if (!container) return;
+-  if (!text?.trim()) {
+-    container.innerHTML = `<div class="noc-empty"><p>Nenhuma ONU aguardando em ${oltName}</p></div>`;
+-    return;
+-  }
+-
+-  const rows = [];
+-  for (const line of text.split("\n")) {
+-    const m = line.match(/(\d+\/\d+\/\d+)\s+([A-Z0-9]{8,})/i);
+-    if (m) rows.push({ pon: m[1], serial: m[2].toUpperCase() });
+-  }
+-
+-  if (!rows.length) {
+-    container.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;">${formatOutput(text)}</div>`;
+-    return;
+-  }
+-
+-  container.innerHTML = rows.map(r => `
+-    <div class="noc-card" onclick="fillFromDiscovered('${r.pon}','${r.serial}',event)"
+-         style="border-color:${C.warning}33;">
+-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+-        <span class="noc-badge" style="color:${C.warning};background:${C.warning}18;border:1px solid ${C.warning}33;">
+-          Aguardando
+-        </span>
+-        <span style="font-size:9px;color:${C.dim};">PON ${r.pon}</span>
+-      </div>
+-      <div style="font-size:11px;font-weight:700;color:${C.warning};">${r.serial}</div>
+-      <div style="font-size:9px;color:${C.dim};margin-top:4px;">↑ clique para usar</div>
+-    </div>`).join("");
+-}
+-
+-function fillFromDiscovered(pon, serial, event) {
+-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+-  set("act-pon",    pon);
+-  set("act-serial", serial);
+-  document.querySelectorAll(".noc-card").forEach(c => c.classList.remove("selected"));
+-  event?.currentTarget?.classList.add("selected");
+-  showToast(`Serial ${serial} · PON ${pon} preenchidos`);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// DELETE LIST PARSER
+-// ─────────────────────────────────────────────────────────────
+-
+-function renderDeleteCards(output, container) {
+-  if (!container) return;
+-  if (!output?.trim()) {
+-    container.innerHTML = `<div class="noc-empty"><p>Nenhuma ONU encontrada</p></div>`;
+-    return;
+-  }
+-
+-  const onus = [];
+-  for (const line of output.split("\n")) {
+-    const m = line.match(/(\d+\/\d+\/\d+).*?(\d+).*?([A-Z0-9]{8,})/);
+-    if (m) onus.push({ pon: m[1], id: m[2], serial: m[3] });
+-  }
+-
+-  if (!onus.length) {
+-    container.innerHTML = `<div style="font-size:11px;font-family:'JetBrains Mono',monospace;">${formatOutput(output)}</div>`;
+-    return;
+-  }
+-
+-  container.innerHTML = onus.map(onu => `
+-    <div class="noc-card" onclick='fillDeleteForm(${JSON.stringify(onu).replace(/'/g, "\\'")})'>
+-      <div class="noc-kv"><span class="noc-label">PON</span><span class="noc-value" style="color:${C.accent};">${onu.pon}</span></div>
+-      <div class="noc-kv"><span class="noc-label">ONU ID</span><span class="noc-value">${onu.id}</span></div>
+-      <div class="noc-kv"><span class="noc-label">Serial</span><span class="noc-value" style="color:${C.warning};">${onu.serial}</span></div>
+-    </div>`).join("");
+-}
+-
+-function fillDeleteForm(onu) {
+-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+-  set("del-pon",    onu.pon);
+-  set("del-id",     onu.id);
+-  set("del-serial", onu.serial);
+-  showToast(`ONU ${onu.id} · ${onu.serial} selecionada`);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// DISCOVERED PAGE — parseONUsToCards
+-// ─────────────────────────────────────────────────────────────
+-
+-function parseONUsToCards(text, container) {
+-  if (!container) return;
+-  if (!text?.trim()) {
+-    container.innerHTML = `<div class="noc-empty" style="grid-column:1/-1;"><p>Nenhuma ONU encontrada</p></div>`;
+-    return;
+-  }
+-
+-  const lines = text.split("\n").filter(l => l.trim());
+-  const onus = [];
+-  let cur = null;
+-
+-  for (const line of lines) {
+-    const onuM  = line.match(/onu\s+(\d+)/i);
+-    const statM = line.match(/\b(up|down|online|offline|active|inactive)\b/i);
+-    const serM  = line.match(/[A-Z]{4}[0-9A-F]{8,}/i);
+-    const nameM = line.match(/name[:\s]+(\S+)/i);
+-    const vlanM = line.match(/vlan[:\s-]+(\d+)/i);
+-    const sigM  = line.match(/([-\d.]+)\s*dBm/i);
+-    const ponM  = line.match(/gpon\s+([\d/]+)/i) || line.match(/(\d+\/\d+\/\d+)/);
+-
+-    if (onuM) {
+-      if (cur) onus.push(cur);
+-      cur = {
+-        id:     onuM[1],
+-        name:   nameM?.[1] ?? null,
+-        status: statM?.[1]?.toLowerCase() ?? "unknown",
+-        serial: serM?.[0]?.toUpperCase() ?? null,
+-        vlan:   vlanM?.[1] ?? null,
+-        signal: sigM ? `${sigM[1]} dBm` : null,
+-        pon:    ponM ? (ponM[1] ?? ponM[0]) : null,
+-      };
+-    } else if (cur) {
+-      if (statM && cur.status === "unknown") cur.status = statM[1].toLowerCase();
+-      if (serM  && !cur.serial) cur.serial = serM[0].toUpperCase();
+-      if (nameM && !cur.name)   cur.name   = nameM[1];
+-      if (vlanM && !cur.vlan)   cur.vlan   = vlanM[1];
+-      if (sigM  && !cur.signal) cur.signal = `${sigM[1]} dBm`;
+-      if (ponM  && !cur.pon)    cur.pon    = ponM[1] ?? ponM[0];
+-    }
+-  }
+-  if (cur) onus.push(cur);
+-
+-  if (!onus.length) {
+-    container.innerHTML = `<div class="noc-empty" style="grid-column:1/-1;">${formatOutput(text)}</div>`;
+-    return;
+-  }
+-
+-  container.innerHTML = onus.map(onu => {
+-    const online  = /up|online|active/.test(onu.status);
+-    const offline = /down|offline|inactive/.test(onu.status);
+-    const sigRaw  = onu.signal ? parseFloat(onu.signal) : NaN;
+-    const sigCol  = isNaN(sigRaw) ? C.dim : sigRaw > -25 ? C.success : sigRaw > -30 ? C.warning : C.danger;
+-    const stColor = online ? C.success : offline ? C.danger : C.muted;
+-
+-    return `
+-      <div class="noc-card status-${online ? "up" : offline ? "down" : ""}">
+-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+-          <div>
+-            <div style="font-size:10px;font-weight:700;color:${C.accent};">ONU ${onu.id}</div>
+-            ${onu.name ? `<div style="font-size:9px;color:${C.dim};margin-top:1px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${onu.name}</div>` : ""}
+-          </div>
+-          ${statusBadge(online ? "Up" : offline ? "Down" : onu.status)}
+-        </div>
+-        <div style="display:flex;flex-direction:column;gap:2px;">
+-          ${onu.serial ? `<div class="noc-kv"><span class="noc-label">Serial</span><span class="noc-value" style="color:${C.warning};">${onu.serial}</span></div>` : ""}
+-          ${onu.pon    ? `<div class="noc-kv"><span class="noc-label">PON</span><span class="noc-value" style="color:${C.text};">${onu.pon}</span></div>` : ""}
+-          ${onu.vlan   ? `<div class="noc-kv"><span class="noc-label">VLAN</span><span class="noc-value" style="color:${C.accent};">${onu.vlan}</span></div>` : ""}
+-          ${onu.signal ? `<div class="noc-kv"><span class="noc-label">Sinal</span><span class="noc-value" style="color:${sigCol};">${onu.signal}</span></div>` : ""}
+-        </div>
+-      </div>`;
+-  }).join("");
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — ONU STATUS
+-// ─────────────────────────────────────────────────────────────
+-
+-async function loadONUs(e = null) {
+-  const btn       = e?.target?.closest("button") ?? null;
+-  const container = document.getElementById("onu-output");
+-  if (btn) setLoading(btn, true);
+-  gridLoading(container, "Buscando ONUs...");
+-
+-  try {
+-    const olt = getSelectedOlt();
+-    const res  = await fetch(`${API}/onu/status/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt }),
+-    });
+-    const data = await res.json();
+-    data.error
+-      ? gridError(container, data.error)
+-      : parseOLTToCards(data.output, container);
+-  } catch {
+-    gridError(container, "Erro ao carregar ONUs. API offline?");
+-    showToast("Erro ao carregar ONUs", "error");
+-  }
+-
+-  if (btn) setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — DISCOVERED
+-// ─────────────────────────────────────────────────────────────
+-
+-async function loadDiscovered(e) {
+-  const btn       = e.target.closest("button");
+-  const container = document.getElementById("disc-output");
+-  setLoading(btn, true);
+-  gridLoading(container, "Buscando dispositivos...");
+-
+-  try {
+-    const olt = document.getElementById("disc-olt").value;
+-    const res  = await fetch(`${API}/onu/discovered/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt }),
+-    });
+-    const data = await res.json();
+-    data.error
+-      ? gridError(container, data.error)
+-      : parseONUsToCards(data.output, container);
+-  } catch {
+-    gridError(container, "Erro ao buscar ONUs descobertas.");
+-    showToast("Erro ao buscar ONUs", "error");
+-  }
+-  setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — DISCOVERED PANEL (painel lateral da página Ativar)
+-// ─────────────────────────────────────────────────────────────
+-
+-async function refreshDiscoveredPanel(e) {
+-  if (e) {
+-    const btn = e.target.closest("button");
+-    setLoading(btn, true);
+-    setTimeout(() => setLoading(btn, false), 3500);
+-  }
+-
+-  const container = document.getElementById("act-disc-list");
+-  if (!container) return;
+-  const olt = document.getElementById("act-olt")?.value;
+-  if (!olt) return;
+-
+-  container.innerHTML = `<div class="noc-loading"><span class="noc-spinner"></span><span style="font-size:10px;">Buscando em ${olt}...</span></div>`;
+-
+-  try {
+-    const res  = await fetch(`${API}/onu/discovered/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt }),
+-    });
+-    const data = await res.json();
+-    parseDiscoveredToPanel(data.output ?? data.error, container, olt);
+-  } catch {
+-    container.innerHTML = `<div class="noc-empty" style="color:${C.danger};"><p>Erro ao buscar.<br>API offline?</p></div>`;
+-  }
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — ONU INFO
+-// ─────────────────────────────────────────────────────────────
+-
+-async function getSignal(olt, pon, id) {
+-  const box = document.getElementById("signal-detail-box");
+-  if (!box) return;
+-
+-  box.innerHTML = `<div class="noc-loading"><span class="noc-spinner"></span><span>Consultando ONU ${id}...</span></div>`;
+-
+-  const sinalEl = document.getElementById("onu-sinal");
+-  if (sinalEl) { sinalEl.textContent = "..."; sinalEl.style.color = C.dim; }
+-
+-  try {
+-    const res  = await fetch(`${API}/onu/info/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt, pon, onu_id: parseInt(id) }),
+-    });
+-    const data = await res.json();
+-
+-    if (data.error && !data.detail) {
+-      box.innerHTML = `<p style="color:${C.danger};font-size:11px;font-family:'JetBrains Mono',monospace;">${data.error}</p>`;
+-      return;
+-    }
+-
+-    const detail  = data.detail  || {};
+-    const service = data.service || {};
+-
+-    if (sinalEl) {
+-      const rx = parseFloat(detail.rx_power);
+-      sinalEl.textContent = detail.rx_power ? `${detail.rx_power} dBm` : "N/A";
+-      sinalEl.style.color = isNaN(rx) ? C.dim : rx >= -25 ? C.success : rx >= -28 ? C.warning : C.danger;
+-    }
+-
+-    box.innerHTML = renderOnuDetailPanel(detail, service, pon, id, olt);
+-
+-  } catch (err) {
+-    console.error("[getSignal]", err);
+-    box.innerHTML = `<p style="color:${C.danger};font-size:11px;font-family:'JetBrains Mono',monospace;">Erro de conexão com a API.</p>`;
+-  }
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// RENDER — bloco IPv4
+-// ─────────────────────────────────────────────────────────────
+-
+-function renderIpv4Block(ipv4) {
+-  if (!ipv4) return "";
+-
+-  const row = (label, value, color = C.text) => value ? `
+-    <div class="noc-row">
+-      <span class="noc-label">${label}</span>
+-      <span class="noc-value" style="color:${color};">${value}</span>
+-    </div>` : "";
+-
+-  if (ipv4.configured) {
+-    return `
+-      <div style="margin-top:8px;padding:8px 10px;border-radius:6px;
+-                  border:1px solid ${C.success}33;background:${C.success}0d;">
+-        <div style="font-size:9px;font-weight:700;color:${C.success};text-transform:uppercase;
+-                    letter-spacing:.06em;margin-bottom:5px;">● IPv4 — OLT</div>
+-        ${row("Endereço", ipv4.address, C.success)}
+-        ${row("Gateway",  ipv4.gateway)}
+-        ${row("VLAN",     ipv4.vlan,    C.accent)}
+-        ${ipv4.mode && ipv4.mode !== "Not configured" ? row("Modo", ipv4.mode, C.dim) : ""}
+-      </div>`;
+-  }
+-
+-  if (ipv4.source === "pppoe_bras") {
+-    return `
+-      <div style="margin-top:8px;padding:8px 10px;border-radius:6px;
+-                  border:1px solid ${C.accent}33;background:${C.accent}0d;">
+-        <div style="font-size:9px;font-weight:700;color:${C.accent};text-transform:uppercase;
+-                    letter-spacing:.06em;margin-bottom:4px;">◎ IPv4 — PPPoE / BRAS</div>
+-        <div style="font-size:10px;color:${C.dim};line-height:1.5;font-family:'JetBrains Mono',monospace;">
+-          ${ipv4.note || "IP via PPPoE pelo BRAS — não visível na OLT."}
+-        </div>
+-      </div>`;
+-  }
+-
+-  return `
+-    <div style="margin-top:8px;padding:8px 10px;border-radius:6px;border:1px solid ${C.border};">
+-      <div style="font-size:9px;font-weight:700;color:${C.dim};text-transform:uppercase;
+-                  letter-spacing:.06em;margin-bottom:4px;">○ IPv4</div>
+-      <div style="font-size:10px;color:${C.dim};font-family:'JetBrains Mono',monospace;">
+-        ${ipv4.note || "Nenhum IP configurado na OLT."}
+-      </div>
+-    </div>`;
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// RENDER — painel de detalhes completo da ONU
+-// ─────────────────────────────────────────────────────────────
+-
+-function renderOnuDetailPanel(onu, service, ponId, onuId, olt) {
+-
+-  const statusColor = onu.status?.toLowerCase() === "up" ? C.success : C.danger;
+-
+-  const row = (label, value, color = C.text) => value ? `
+-    <div class="noc-row">
+-      <span class="noc-label">${label}</span>
+-      <span class="noc-value" style="color:${color};word-break:break-all;text-align:right;max-width:65%;">${value}</span>
+-    </div>` : "";
+-
+-  const sessions = service.pppoe_sessions ?? [];
+-  const pppoeHtml = sessions.length
+-    ? sessions.map(s => `
+-        ${row("Session ID", s.session_id, C.success)}
+-        ${row("MAC", s.mac, C.warning)}`).join("")
+-    : `<div class="noc-row">
+-         <span class="noc-label">PPPoE</span>
+-         <span class="noc-value" style="color:${C.danger};">Sem sessão ativa</span>
+-       </div>`;
+-
+-  const vlans = service.vlans ?? [];
+-
+-  return `
+-    <div style="font-family:'JetBrains Mono',monospace;">
+-
+-      <!-- cabeçalho -->
+-      <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid ${C.border};">
+-        <div style="font-size:9px;color:${C.dim};margin-bottom:3px;">PON ${ponId} · ONU ${onuId}</div>
+-        <div style="font-size:13px;font-weight:700;color:${C.warning};word-break:break-all;">
+-          ${onu.serial ?? "—"}
+-        </div>
+-        ${onu.name && onu.name !== "—"
+-          ? `<div style="font-size:9px;color:${C.success};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${onu.name}</div>`
+-          : ""}
+-      </div>
+-
+-      <!-- sinais ópticos (2 col) -->
+-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+-        <div style="background:${C.bgLow};border-radius:6px;padding:8px;border:1px solid ${C.border};text-align:center;">
+-          <div style="font-size:9px;color:${C.dim};text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Rx ↓</div>
+-          <div style="font-size:15px;font-weight:700;color:${dbmColor(onu.rx_power)};">
+-            ${onu.rx_power ?? "—"}
+-          </div>
+-          ${onu.rx_power ? `<div style="font-size:8px;color:${C.dim};">dBm</div>` : ""}
+-        </div>
+-        <div style="background:${C.bgLow};border-radius:6px;padding:8px;border:1px solid ${C.border};text-align:center;">
+-          <div style="font-size:9px;color:${C.dim};text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">RSS ↑</div>
+-          <div style="font-size:15px;font-weight:700;color:${dbmColor(onu.rss_power)};">
+-            ${onu.rss_power ?? "—"}
+-          </div>
+-          ${onu.rss_power ? `<div style="font-size:8px;color:${C.dim};">dBm</div>` : ""}
+-        </div>
+-      </div>
+-
+-      <!-- dados da ONU -->
+-      <div style="margin-bottom:8px;">
+-        ${row("Status",    onu.status,   statusColor)}
+-        ${row("Uptime",    onu.uptime)}
+-        ${row("Tx Power",  onu.tx_power ? `${onu.tx_power} dBm` : null, C.accent)}
+-        ${row("Perfil",    onu.profile)}
+-        ${row("Distância", onu.distance ? `${onu.distance} km` : null)}
+-        ${row("Vendor",    onu.vendor)}
+-        ${row("Equipment", onu.equipment)}
+-        ${row("FW Ativo",  onu.active_fw)}
+-        ${row("FW Standby",onu.standby_fw)}
+-        ${row("Versão",    onu.version)}
+-        ${row("FEC",       onu.fec)}
+-        ${row("Banda",     onu.bandwidth)}
+-      </div>
+-
+-      <!-- IPv4 -->
+-      ${renderIpv4Block(onu.ipv4)}
+-
+-      <!-- serviço -->
+-      <div style="margin-top:8px;padding-top:8px;border-top:1px solid ${C.border};">
+-        <div style="font-size:9px;color:${C.dim};text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Serviço</div>
+-        ${row("Service Port", service.service_port, C.accent)}
+-        ${row("VLANs", vlans.length ? vlans.join(" · ") : null, C.warning)}
+-        ${pppoeHtml}
+-        <div style="font-size:9px;color:${C.dim};margin-top:5px;line-height:1.4;">
+-          💡 IP do cliente está no BRAS/BNG, não na OLT.
+-        </div>
+-      </div>
+-
+-      <!-- botão reboot -->
+-      <div style="margin-top:12px;">
+-        <button
+-          style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;
+-                 padding:8px 0;border-radius:7px;cursor:pointer;
+-                 background:${C.danger}15;color:${C.danger};
+-                 border:1px solid ${C.danger}33;
+-                 font-size:10px;font-weight:700;
+-                 font-family:'JetBrains Mono',monospace;
+-                 transition:background .15s,border-color .15s;"
+-          onmouseover="this.style.background='${C.danger}28';this.style.borderColor='${C.danger}55';"
+-          onmouseout="this.style.background='${C.danger}15';this.style.borderColor='${C.danger}33';"
+-          onclick="rebootONU('${olt}','${ponId}','${onuId}',this)">
+-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+-            <polyline points="23 4 23 10 17 10"/>
+-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+-          </svg>
+-          Reiniciar ONU
+-        </button>
+-      </div>
+-    </div>`;
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — ONU ACTIVATE
+-// ─────────────────────────────────────────────────────────────
+-
+-async function activateONU(e) {
+-  const btn = e.target.closest("button");
+-  setLoading(btn, true);
+-
+-  const get = id => document.getElementById(id)?.value?.trim() ?? "";
+-  const payload = {
+-    olt:          get("act-olt"),
+-    pon:          get("act-pon"),
+-    onu_id:       parseInt(get("act-id")),
+-    serial:       get("act-serial"),
+-    name:         get("act-name"),
+-    vlan:         parseInt(get("act-vlan")),
+-    profile:      get("act-profile"),
+-    service_port: parseInt(get("act-service")),
+-  };
+-
+-  if (!payload.pon || !payload.serial || !payload.name ||
+-      isNaN(payload.onu_id) || isNaN(payload.vlan) || isNaN(payload.service_port)) {
+-    showToast("Preencha todos os campos obrigatórios", "error");
+-    setLoading(btn, false);
+-    return;
+-  }
+-
+-  const outEl = document.getElementById("act-output");
+-  try {
+-    const res  = await fetch(`${API}/onu/activate/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify(payload),
+-    });
+-    const data = await res.json();
+-    if (outEl) {
+-      outEl.style.display = "block";
+-      outEl.innerHTML = formatOutput(data.output ?? data.error);
+-    }
+-    data.error
+-      ? showToast("Erro na ativação: " + data.error.slice(0, 60), "error")
+-      : showToast("ONU ativada com sucesso!");
+-    if (!data.error) setTimeout(() => refreshDiscoveredPanel(), 2500);
+-  } catch {
+-    if (outEl) { outEl.style.display = "block"; outEl.innerHTML = `<span style="color:${C.danger};">Erro de conexão com a API.</span>`; }
+-    showToast("Erro ao ativar ONU", "error");
+-  }
+-  setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — ONU DELETE
+-// ─────────────────────────────────────────────────────────────
+-
+-async function deleteONU(e) {
+-  const btn = e.target.closest("button");
+-
+-  const get = id => document.getElementById(id)?.value?.trim() ?? "";
+-  const payload = {
+-    olt:          get("del-olt"),
+-    pon:          get("del-pon"),
+-    onu_id:       parseInt(get("del-id")),
+-    serial:       get("del-serial"),
+-    service_port: parseInt(get("del-service")),
+-  };
+-
+-  if (!payload.pon || isNaN(payload.onu_id) || isNaN(payload.service_port)) {
+-    showToast("Preencha PON, ONU ID e Service Port", "error");
+-    return;
+-  }
+-
+-  setLoading(btn, true);
+-  const outEl = document.getElementById("del-output");
+-
+-  try {
+-    const res  = await fetch(`${API}/onu/delete/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify(payload),
+-    });
+-    const data = await res.json();
+-    if (outEl) {
+-      outEl.style.display = "block";
+-      outEl.innerHTML = formatOutput(data.output ?? data.error);
+-    }
+-    data.error
+-      ? showToast("Erro ao deletar: " + data.error.slice(0, 60), "error")
+-      : showToast("ONU deletada com sucesso");
+-  } catch {
+-    if (outEl) { outEl.style.display = "block"; outEl.innerHTML = `<span style="color:${C.danger};">Erro de conexão com a API.</span>`; }
+-    showToast("Erro ao deletar ONU", "error");
+-  }
+-  setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — LOAD ONUs TO DELETE
+-// ─────────────────────────────────────────────────────────────
+-
+-async function loadONUsToDelete(e) {
+-  const btn       = e.target.closest("button");
+-  const container = document.getElementById("del-list");
+-  if (!container) return;
+-
+-  const olt = document.getElementById("del-olt")?.value;
+-  if (!olt) { showToast("Selecione uma OLT", "error"); return; }
+-
+-  setLoading(btn, true);
+-  container.innerHTML = `<div class="noc-loading"><span class="noc-spinner"></span><span style="font-size:10px;">Buscando em ${olt}...</span></div>`;
+-
+-  try {
+-    const res  = await fetch(`${API}/onu/status/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt }),
+-    });
+-    const data = await res.json();
+-    data.error
+-      ? (container.innerHTML = `<div class="noc-empty" style="color:${C.danger};"><p>${data.error}</p></div>`)
+-      : renderDeleteCards(data.output, container);
+-  } catch {
+-    container.innerHTML = `<div class="noc-empty" style="color:${C.danger};"><p>Erro ao conectar com API</p></div>`;
+-    showToast("Erro ao carregar ONUs", "error");
+-  }
+-  setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — REBOOT ONU
+-// ─────────────────────────────────────────────────────────────
+-
+-async function rebootONU(olt, pon, id, btn) {
+-  if (!confirm(`Reiniciar ONU ${id} na PON ${pon}?\nO cliente ficará sem conexão por ~1 min.`)) return;
+-
+-  setLoading(btn, true);
+-  try {
+-    const res  = await fetch(`${API}/onu/reboot/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt, pon, onu_id: parseInt(id) }),
+-    });
+-    const data = await res.json();
+-    data.error
+-      ? showToast("Erro ao reiniciar: " + data.error.slice(0, 60), "error")
+-      : showToast(`ONU ${id} reiniciada com sucesso!`);
+-    if (!data.error) setTimeout(() => getSignal(olt, pon, id), 5000);
+-  } catch {
+-    showToast("Erro de conexão ao reiniciar", "error");
+-  }
+-  setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// ACTIVATE PAGE — handler troca de OLT
+-// ─────────────────────────────────────────────────────────────
+-
+-function onActOltChange() {
+-  const olt  = document.getElementById("act-olt")?.value;
+-  const meta = OLT_META[olt] ?? {};
+-  const hint = document.getElementById("act-olt-hint");
+-
+-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ""; };
+-  set("act-vlan",    meta.vlan);
+-  set("act-profile", meta.profile);
+-
+-  if (hint) {
+-    if (meta.hint) {
+-      hint.style.display = "flex";
+-      hint.innerHTML = `
+-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="${C.accent}" stroke-width="2">
+-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+-        </svg>
+-        ${meta.hint}`;
+-    } else {
+-      hint.style.display = "none";
+-    }
+-  }
+-  refreshDiscoveredPanel();
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// TERMINAL
+-// ─────────────────────────────────────────────────────────────
+-
+-function updateTermLabel() {
+-  const olt   = document.getElementById("term-olt")?.value;
+-  const label = document.getElementById("term-label");
+-  if (label && olt) label.textContent = `noc@datacom ~ ${OLT_LABELS[olt] || olt}`;
+-}
+-
+-function clearTerminal() {
+-  const log = document.getElementById("terminal-log");
+-  if (log) log.innerHTML = `
+-    <div style="color:${C.success};font-size:11px;font-family:'JetBrains Mono',monospace;">Terminal limpo.</div>
+-    <div style="color:${C.dim};font-size:11px;">──────────────────────────────────────</div>`;
+-}
+-
+-function initTerminal() {
+-  const input = document.getElementById("terminal-input");
+-  if (!input) return;
+-
+-  input.addEventListener("keypress", async (e) => {
+-    if (e.key !== "Enter") return;
+-    const log = document.getElementById("terminal-log");
+-    const cmd = e.target.value.trim();
+-    if (!cmd) return;
+-
+-    const olt = document.getElementById("term-olt")?.value || "KM70";
+-
+-    log.innerHTML += `
+-      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;margin:2px 0;">
+-        <span style="color:${C.success};">[${olt}]</span>
+-        <span style="color:${C.accent};margin:0 6px;">❯</span>
+-        <span style="color:${C.text};">${cmd.replace(/</g, "&lt;")}</span>
+-      </div>`;
+-    e.target.value = "";
+-    log.scrollTop = log.scrollHeight;
+-
+-    try {
+-      const res  = await fetch(`${API}/olt/terminal/`, {
+-        method:  "POST",
+-        headers: { "Content-Type": "application/json" },
+-        body:    JSON.stringify({ olt, command: cmd }),
+-      });
+-      const data = await res.json();
+-      const out  = data.output ?? data.error ?? "Sem resposta";
+-      log.innerHTML += `<div style="white-space:pre-wrap;color:${C.dim};font-size:11px;font-family:'JetBrains Mono',monospace;margin:2px 0 6px;">${formatOutput(out)}</div>`;
+-    } catch {
+-      log.innerHTML += `<div style="color:${C.danger};font-size:11px;font-family:'JetBrains Mono',monospace;">✗ Erro de conexão com a API</div>`;
+-    }
+-    log.scrollTop = log.scrollHeight;
+-  });
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// DASHBOARD
+-// ─────────────────────────────────────────────────────────────
+-
+-async function checkOLTHealth(name) {
+-  const el = document.getElementById(`olt-badge-${name}`);
+-  if (!el) return;
+-  try {
+-    const res  = await fetch(`${API}/health/${name}/`);
+-    const data = await res.json();
+-    const online = data.online;
+-    const color  = online ? C.success : C.danger;
+-    const label  = online ? "Online" : "Offline";
+-    el.style.cssText = `
+-      display:inline-flex;align-items:center;gap:5px;
+-      padding:2px 8px;border-radius:999px;
+-      font-size:10px;font-weight:700;text-transform:uppercase;
+-      font-family:'JetBrains Mono',monospace;
+-      background:${color}18;color:${color};border:1px solid ${color}33;`;
+-    el.innerHTML = `<span style="width:5px;height:5px;border-radius:50%;background:${color};display:inline-block;${online ? `box-shadow:0 0 4px ${color}88;` : ""}"></span>${label}`;
+-  } catch {
+-    el.style.cssText = `display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:10px;font-family:'JetBrains Mono',monospace;background:${C.dim}18;color:${C.dim};border:1px solid ${C.dim}33;`;
+-    el.textContent = "Erro";
+-  }
+-}
+-
+-async function dashRefresh() {
+-  const firstOlt = Object.keys(OLT_LABELS)[0];
+-
+-  try {
+-    const res  = await fetch(`${API}/onu/status/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt: firstOlt }),
+-    });
+-    const data = await res.json();
+-    if (data.output) {
+-      const online  = (data.output.match(/\bup\b/gi)   || []).length;
+-      const offline = (data.output.match(/\bdown\b/gi) || []).length;
+-      const onlineEl = document.getElementById("dash-online");
+-      const alertsEl = document.getElementById("dash-alerts");
+-      if (onlineEl) onlineEl.textContent = online;
+-      if (alertsEl) alertsEl.textContent = offline;
+-    }
+-  } catch { /* silencioso */ }
+-
+-  Object.keys(OLT_LABELS).forEach(checkOLTHealth);
+-
+-  const syncEl = document.getElementById("last-sync");
+-  if (syncEl) syncEl.textContent = new Date().toLocaleTimeString("pt-BR");
+-}
+\ No newline at end of file
++/**
++ * NOC DATACOM — bootstrap
++ *
++ * O código principal foi dividido em módulos clássicos carregados pelos templates:
++ * - noc/config.js
++ * - noc/ui.js
++ * - noc/parsers.js
++ * - noc/pages.js
++ */
++"use strict";
+Only in datacom_work/Datacom/web/static/script: noc
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/web/static/script/noc.js datacom_work/Datacom/web/static/script/noc.js
+--- orig_datacom/Datacom/web/static/script/noc.js	2026-04-26 08:48:00.000000000 +0000
++++ datacom_work/Datacom/web/static/script/noc.js	2026-05-24 05:41:10.337640060 +0000
+@@ -1,1209 +1,10 @@
+-/**
+- * NOC DATACOM — noc.js v3.2
+- *
+- * v3.2:
+- *   - Todos os componentes visuais com estilos 100% inline (sem dependência de noc.css)
+- *   - Cards de ONU com layout compacto, tipografia monospace, cores por status
+- *   - Painel de detalhe reescrito com grid 2 colunas para sinais
+- *   - Compatible com Tailwind CDN (sem variáveis CSS)
+- */
+-
+-"use strict";
+-
+-// ─────────────────────────────────────────────────────────────
+-// CONFIG
+-// ─────────────────────────────────────────────────────────────
+-
+-const API = "/core";
+-
+-const OLT_META = {
+-  KM70:     { vlan: null, profile: null,            hint: null },
+-  KM17:     { vlan: null, profile: null,            hint: null },
+-  ABUNA:    { vlan: null, profile: null,            hint: null },
+-  CALAMA:   { vlan: 306,  profile: "PPPoE-Vlan306", hint: "CALAMA — VLAN 306 · PPPoE-Vlan306" },
+-  MOANENSE: { vlan: 304,  profile: "PPPoE-Vlan304", hint: "MOANENSE — VLAN 304 · PPPoE-Vlan304" },
+-};
+-
+-const OLT_LABELS = {
+-  KM70:     "KM70 — 10.0.62.200:50022",
+-  KM17:     "KM17 — 10.0.54.201:50022",
+-  ABUNA:    "ABUNÃ — 10.0.53.201:50022",
+-  CALAMA:   "CALAMA — 192.168.230.37:22",
+-  MOANENSE: "MOANENSE — 192.168.230.46:22",
+-};
+-
+-// ── Paleta de cores
+-const C = {
+-  text:    "#dae2fd",
+-  dim:     "#64748b",
+-  muted:   "#909097",
+-  border:  "#1e2535",
+-  bg:      "#111827",
+-  bgCard:  "#151d2e",
+-  bgLow:   "#0b1120",
+-  accent:  "#7bd0ff",
+-  success: "#4edea3",
+-  warning: "#ffb95f",
+-  danger:  "#ff6b7a",
+-};
+-
+-// ─────────────────────────────────────────────────────────────
+-// ESTILOS INLINE BASE (injetados uma vez no <head>)
+-// ─────────────────────────────────────────────────────────────
+-
+-(function injectBaseStyles() {
+-  if (document.getElementById("noc-base-styles")) return;
+-  const s = document.createElement("style");
+-  s.id = "noc-base-styles";
+-  s.textContent = `
+-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+-
+-    .noc-card {
+-      background: ${C.bgCard};
+-      border: 1px solid ${C.border};
+-      border-radius: 8px;
+-      padding: 10px 12px;
+-      cursor: pointer;
+-      transition: border-color .15s, background .15s, transform .1s;
+-      font-family: 'JetBrains Mono', monospace;
+-      position: relative;
+-      overflow: hidden;
+-    }
+-    .noc-card:hover {
+-      border-color: #2a3550;
+-      background: #1a2238;
+-      transform: translateY(-1px);
+-    }
+-    .noc-card.selected {
+-      border-color: ${C.accent}66 !important;
+-      background: #0d1829 !important;
+-      box-shadow: 0 0 0 1px ${C.accent}22, 0 4px 20px rgba(123,208,255,.08);
+-    }
+-    .noc-card::before {
+-      content: '';
+-      position: absolute;
+-      top: 0; left: 0; right: 0;
+-      height: 2px;
+-      border-radius: 8px 8px 0 0;
+-    }
+-    .noc-card.status-up::before   { background: ${C.success}; }
+-    .noc-card.status-down::before { background: ${C.danger}; }
+-
+-    .noc-kv {
+-      display: flex;
+-      justify-content: space-between;
+-      align-items: center;
+-      padding: 2px 0;
+-    }
+-    .noc-label {
+-      font-size: 9px;
+-      color: ${C.dim};
+-      text-transform: uppercase;
+-      letter-spacing: .05em;
+-      font-weight: 500;
+-    }
+-    .noc-value {
+-      font-size: 10px;
+-      font-weight: 600;
+-      color: ${C.text};
+-      font-family: 'JetBrains Mono', monospace;
+-    }
+-    .noc-badge {
+-      display: inline-flex;
+-      align-items: center;
+-      gap: 4px;
+-      padding: 1px 7px;
+-      border-radius: 999px;
+-      font-size: 9px;
+-      font-weight: 700;
+-      text-transform: uppercase;
+-      letter-spacing: .05em;
+-    }
+-    .noc-dot {
+-      width: 5px; height: 5px;
+-      border-radius: 50%;
+-      display: inline-block;
+-    }
+-
+-    /* loading / empty states */
+-    .noc-loading {
+-      display: flex;
+-      flex-direction: column;
+-      align-items: center;
+-      justify-content: center;
+-      gap: 10px;
+-      padding: 40px;
+-      color: ${C.dim};
+-      font-size: 11px;
+-      font-family: 'JetBrains Mono', monospace;
+-    }
+-    .noc-spinner {
+-      width: 20px; height: 20px;
+-      border: 2px solid ${C.border};
+-      border-top-color: ${C.accent};
+-      border-radius: 50%;
+-      animation: noc-spin .7s linear infinite;
+-    }
+-    @keyframes noc-spin { to { transform: rotate(360deg); } }
+-
+-    .noc-empty {
+-      display: flex;
+-      flex-direction: column;
+-      align-items: center;
+-      justify-content: center;
+-      gap: 8px;
+-      padding: 40px;
+-      color: ${C.dim};
+-      font-size: 11px;
+-      font-family: 'JetBrains Mono', monospace;
+-      text-align: center;
+-    }
+-
+-    /* detail panel rows */
+-    .noc-row {
+-      display: flex;
+-      justify-content: space-between;
+-      align-items: center;
+-      padding: 4px 0;
+-      border-bottom: 1px solid ${C.border};
+-    }
+-    .noc-row:last-child { border-bottom: none; }
+-
+-    /* scrollbar */
+-    ::-webkit-scrollbar { width: 4px; }
+-    ::-webkit-scrollbar-track { background: transparent; }
+-    ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
+-  `;
+-  document.head.appendChild(s);
+-})();
+-
+-// ─────────────────────────────────────────────────────────────
+-// UI HELPERS
+-// ─────────────────────────────────────────────────────────────
+-
+-function markActive(pageKey) {
+-  document.querySelectorAll(".nav-link").forEach(el =>
+-    el.classList.toggle("active", el.dataset.page === pageKey)
+-  );
+-}
+-
+-function showToast(msg, type = "success") {
+-  document.querySelector(".noc-toast")?.remove();
+-  const t = document.createElement("div");
+-  t.className = "noc-toast";
+-  const isErr = type === "error";
+-  t.style.cssText = `
+-    position:fixed;bottom:24px;right:24px;z-index:9999;
+-    display:flex;align-items:center;gap:8px;
+-    padding:10px 16px;
+-    background:#1a2238;
+-    border:1px solid ${isErr ? C.danger + "44" : C.border};
+-    border-radius:8px;font-size:11px;color:${C.text};
+-    box-shadow:0 8px 32px rgba(0,0,0,.6);
+-    font-family:'JetBrains Mono',monospace;
+-    animation: noc-slide-in .2s ease;
+-  `;
+-  const icon = isErr
+-    ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${C.danger}" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`
+-    : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${C.success}" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+-  t.innerHTML = `${icon}<span>${msg}</span>`;
+-  document.body.appendChild(t);
+-  setTimeout(() => {
+-    t.style.transition = "opacity .3s, transform .3s";
+-    t.style.opacity = "0";
+-    t.style.transform = "translateY(6px)";
+-    setTimeout(() => t.remove(), 300);
+-  }, 3000);
+-}
+-
+-function setLoading(btn, loading) {
+-  if (!btn) return;
+-  if (loading) {
+-    btn._prevHtml = btn.innerHTML;
+-    btn.innerHTML = `<span class="noc-spinner" style="width:12px;height:12px;border-width:1.5px;display:inline-block;vertical-align:middle;margin-right:6px;"></span>Carregando...`;
+-    btn.disabled = true;
+-  } else {
+-    if (btn._prevHtml) btn.innerHTML = btn._prevHtml;
+-    btn.disabled = false;
+-  }
+-}
+-
+-function formatOutput(text) {
+-  if (!text?.trim()) return `<span style="color:${C.dim};">Sem retorno do equipamento.</span>`;
+-  return text
+-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+-    .replace(/\n/g, "<br>")
+-    .replace(/(down|fail|error|offline|aborted?)/gi, `<span style="color:${C.danger};font-weight:700;">$1</span>`)
+-    .replace(/(up|online|success|active|complete)/gi, `<span style="color:${C.success};font-weight:700;">$1</span>`)
+-    .replace(/([-\d.]+\s*dBm)/gi, `<span style="color:${C.accent};font-weight:700;">$1</span>`)
+-    .replace(/([A-Z]{4}[0-9A-F]{8,})/g, `<span style="color:${C.warning};font-weight:700;">$1</span>`);
+-}
+-
+-function gridLoading(container, msg = "Carregando...") {
+-  if (!container) return;
+-  container.innerHTML = `<div class="state-box"><span class="spinner"></span><span>${msg}</span></div>`;
+-}
+-
+-function gridError(container, msg) {
+-  if (!container) return;
+-  container.innerHTML = `<div class="state-box" style="color:${C.danger};"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/></svg><span>${msg}</span></div>`;
+-}
+-
+-function getSelectedOlt() {
+-  return (
+-    document.getElementById("olt-select")?.value ||
+-    document.getElementById("onu-olt")?.value    ||
+-    document.getElementById("act-olt")?.value    ||
+-    null
+-  );
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// BADGE helpers
+-// ─────────────────────────────────────────────────────────────
+-
+-function statusBadge(status) {
+-  const up = status?.toLowerCase() === "up";
+-  const color = up ? C.success : C.danger;
+-  return `
+-    <span class="noc-badge" style="color:${color};background:${color}18;border:1px solid ${color}33;">
+-      <span class="noc-dot" style="background:${color};${up ? `box-shadow:0 0 4px ${color}88;` : ""}"></span>
+-      ${status ?? "?"}
+-    </span>`;
+-}
+-
+-function dbmColor(val) {
+-  const v = parseFloat(val);
+-  return isNaN(v) ? C.dim : v >= -25 ? C.success : v >= -28 ? C.warning : C.danger;
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// ONU CARD PARSER  (lista geral)
+-// ─────────────────────────────────────────────────────────────
+-
+-// cache de ONUs para o filtro de busca
+-let _onuCache = [];
+-
+-function _buildOnuCard(onu, container) {
+-  const isUp = onu.status.toLowerCase() === "up";
+-  const card = document.createElement("div");
+-  // usa .onu-card do template + .up/.down para a barra colorida
+-  card.className = `onu-card ${isUp ? "up" : "down"}`;
+-  card.setAttribute("role", "button");
+-  card.setAttribute("tabindex", "0");
+-  card.dataset.onuId     = onu.id;
+-  card.dataset.onuPon    = onu.pon;
+-  card.dataset.onuSerial = onu.serial.toLowerCase();
+-  card.dataset.onuName   = onu.name.toLowerCase();
+-
+-  const stColor = isUp ? C.success : C.danger;
+-
+-  card.innerHTML = `
+-    <!-- linha topo: PON · ID + badge status -->
+-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+-      <div style="display:flex;align-items:center;gap:5px;">
+-        <span style="font-size:9px;color:${C.dim};text-transform:uppercase;letter-spacing:.04em;">PON</span>
+-        <span style="font-size:10px;color:${C.accent};font-weight:700;">${onu.pon}</span>
+-        <span style="font-size:9px;color:${C.border};">·</span>
+-        <span style="font-size:9px;color:${C.dim};">ID</span>
+-        <span style="font-size:10px;color:${C.text};">${onu.id}</span>
+-      </div>
+-      <span style="
+-        display:inline-flex;align-items:center;gap:3px;
+-        padding:1px 6px;border-radius:999px;
+-        font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+-        color:${stColor};background:${stColor}18;border:1px solid ${stColor}30;">
+-        <span style="width:4px;height:4px;border-radius:50%;background:${stColor};
+-                     ${isUp ? `box-shadow:0 0 4px ${stColor};` : ""}"></span>
+-        ${onu.status}
+-      </span>
+-    </div>
+-
+-    <!-- serial -->
+-    <div style="font-size:11px;font-weight:700;color:${C.warning};
+-                letter-spacing:.03em;line-height:1.2;
+-                ${onu.name ? "margin-bottom:5px;" : ""}">
+-      ${onu.serial}
+-    </div>
+-
+-    <!-- nome (se existir) -->
+-    ${onu.name ? `
+-      <div style="
+-        font-size:9px;color:${C.success};
+-        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+-        padding-top:5px;border-top:1px solid #151e30;margin-top:1px;">
+-        ${onu.name}
+-      </div>` : ""}
+-  `;
+-
+-  const activate = () => {
+-    document.querySelectorAll("#onu-output .onu-card").forEach(c => c.classList.remove("selected"));
+-    card.classList.add("selected");
+-    getSignal(getSelectedOlt(), onu.pon, onu.id);
+-  };
+-  card.addEventListener("click", activate);
+-  card.addEventListener("keydown", e => {
+-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); }
+-  });
+-
+-  container.appendChild(card);
+-}
+-
+-function parseOLTToCards(html, container) {
+-  if (!container) return;
+-  container.innerHTML = "";
+-  _onuCache = [];
+-
+-  const sinalEl = document.getElementById("onu-sinal");
+-  if (sinalEl) { sinalEl.textContent = "--"; sinalEl.style.color = ""; }
+-
+-  // limpa busca ao recarregar
+-  const searchEl = document.getElementById("onu-search");
+-  if (searchEl) { searchEl.value = ""; _updateSearchCount(null); }
+-
+-  const clean = html.replace(/<br>/g, "\n").replace(/<[^>]+>/g, "");
+-  const dataLines = clean.split("\n").slice(2).filter(l => l.trim());
+-
+-  if (!dataLines.length) {
+-    container.innerHTML = `<div class="state-box"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1e2535" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="#1e2535"/></svg><span>Nenhuma ONU encontrada</span></div>`;
+-    return;
+-  }
+-
+-  dataLines.forEach(line => {
+-    const parts = line.trim().split(/\s+/);
+-    if (parts.length < 4) return;
+-    const onu = { pon: parts[0], id: parts[1], serial: parts[2], status: parts[3], name: parts.slice(5).join(" ") || "" };
+-    _onuCache.push(onu);
+-    _buildOnuCard(onu, container);
+-  });
+-
+-  _updateSearchCount(_onuCache.length);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// SEARCH — filtra cards por Serial Number ou Nome
+-// ─────────────────────────────────────────────────────────────
+-
+-function _updateSearchCount(n) {
+-  const el = document.getElementById("onu-search-count");
+-  if (!el) return;
+-  el.textContent = n !== null ? `${n} ONU${n !== 1 ? "s" : ""}` : "";
+-}
+-
+-function filterONUs() {
+-  const query     = (document.getElementById("onu-search")?.value ?? "").toLowerCase().trim();
+-  const container = document.getElementById("onu-output");
+-  if (!container) return;
+-
+-  const cards = [...container.querySelectorAll(".onu-card[data-onu-serial]")];
+-
+-  if (!query) {
+-    cards.forEach(c => c.style.display = "");
+-    container.querySelector(".noc-no-result")?.remove();
+-    _updateSearchCount(_onuCache.length);
+-    return;
+-  }
+-
+-  let visible = 0;
+-  cards.forEach(card => {
+-    const hit = card.dataset.onuSerial.includes(query) || card.dataset.onuName.includes(query);
+-    card.style.display = hit ? "" : "none";
+-    if (hit) visible++;
+-  });
+-
+-  // remove resultado anterior
+-  container.querySelector(".noc-no-result")?.remove();
+-
+-  if (visible === 0) {
+-    const empty = document.createElement("div");
+-    empty.className = "noc-no-result state-box";
+-    empty.style.gridColumn = "1/-1";
+-    empty.innerHTML = `
+-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${C.dim}" stroke-width="1.5">
+-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+-        <line x1="8" y1="11" x2="14" y2="11"/>
+-      </svg>
+-      <span style="color:${C.dim};">
+-        Nenhuma ONU para "<strong style="color:${C.text};">${query}</strong>"
+-      </span>`;
+-    container.appendChild(empty);
+-  }
+-
+-  _updateSearchCount(visible);
+-}
+-
+-function initONUSearch() {
+-  const input = document.getElementById("onu-search");
+-  if (!input) return;
+-  input.addEventListener("input", filterONUs);
+-  input.addEventListener("keydown", e => {
+-    if (e.key === "Escape") { input.value = ""; filterONUs(); input.blur(); }
+-  });
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// DISCOVERED PANEL PARSER
+-// ─────────────────────────────────────────────────────────────
+-
+-function parseDiscoveredToPanel(text, container, oltName) {
+-  if (!container) return;
+-  if (!text?.trim()) {
+-    container.innerHTML = `<div class="noc-empty"><p>Nenhuma ONU aguardando em ${oltName}</p></div>`;
+-    return;
+-  }
+-
+-  const rows = [];
+-  for (const line of text.split("\n")) {
+-    const m = line.match(/(\d+\/\d+\/\d+)\s+([A-Z0-9]{8,})/i);
+-    if (m) rows.push({ pon: m[1], serial: m[2].toUpperCase() });
+-  }
+-
+-  if (!rows.length) {
+-    container.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;">${formatOutput(text)}</div>`;
+-    return;
+-  }
+-
+-  container.innerHTML = rows.map(r => `
+-    <div class="noc-card" onclick="fillFromDiscovered('${r.pon}','${r.serial}',event)"
+-         style="border-color:${C.warning}33;">
+-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+-        <span class="noc-badge" style="color:${C.warning};background:${C.warning}18;border:1px solid ${C.warning}33;">
+-          Aguardando
+-        </span>
+-        <span style="font-size:9px;color:${C.dim};">PON ${r.pon}</span>
+-      </div>
+-      <div style="font-size:11px;font-weight:700;color:${C.warning};">${r.serial}</div>
+-      <div style="font-size:9px;color:${C.dim};margin-top:4px;">↑ clique para usar</div>
+-    </div>`).join("");
+-}
+-
+-function fillFromDiscovered(pon, serial, event) {
+-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+-  set("act-pon",    pon);
+-  set("act-serial", serial);
+-  document.querySelectorAll(".noc-card").forEach(c => c.classList.remove("selected"));
+-  event?.currentTarget?.classList.add("selected");
+-  showToast(`Serial ${serial} · PON ${pon} preenchidos`);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// DELETE LIST PARSER
+-// ─────────────────────────────────────────────────────────────
+-
+-function renderDeleteCards(output, container) {
+-  if (!container) return;
+-  if (!output?.trim()) {
+-    container.innerHTML = `<div class="noc-empty"><p>Nenhuma ONU encontrada</p></div>`;
+-    return;
+-  }
+-
+-  const onus = [];
+-  for (const line of output.split("\n")) {
+-    const m = line.match(/(\d+\/\d+\/\d+).*?(\d+).*?([A-Z0-9]{8,})/);
+-    if (m) onus.push({ pon: m[1], id: m[2], serial: m[3] });
+-  }
+-
+-  if (!onus.length) {
+-    container.innerHTML = `<div style="font-size:11px;font-family:'JetBrains Mono',monospace;">${formatOutput(output)}</div>`;
+-    return;
+-  }
+-
+-  container.innerHTML = onus.map(onu => `
+-    <div class="noc-card" onclick='fillDeleteForm(${JSON.stringify(onu).replace(/'/g, "\\'")})'>
+-      <div class="noc-kv"><span class="noc-label">PON</span><span class="noc-value" style="color:${C.accent};">${onu.pon}</span></div>
+-      <div class="noc-kv"><span class="noc-label">ONU ID</span><span class="noc-value">${onu.id}</span></div>
+-      <div class="noc-kv"><span class="noc-label">Serial</span><span class="noc-value" style="color:${C.warning};">${onu.serial}</span></div>
+-    </div>`).join("");
+-}
+-
+-function fillDeleteForm(onu) {
+-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+-  set("del-pon",    onu.pon);
+-  set("del-id",     onu.id);
+-  set("del-serial", onu.serial);
+-  showToast(`ONU ${onu.id} · ${onu.serial} selecionada`);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// DISCOVERED PAGE — parseONUsToCards
+-// ─────────────────────────────────────────────────────────────
+-
+-function parseONUsToCards(text, container) {
+-  if (!container) return;
+-  if (!text?.trim()) {
+-    container.innerHTML = `<div class="state-box"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1e2535" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="#1e2535"/></svg><span>Nenhuma ONU encontrada</span></div>`;
+-    return;
+-  }
+-
+-  const lines = text.split("\n").filter(l => l.trim());
+-  const onus = [];
+-  let cur = null;
+-
+-  for (const line of lines) {
+-    const onuM  = line.match(/onu\s+(\d+)/i);
+-    const statM = line.match(/\b(up|down|online|offline|active|inactive)\b/i);
+-    const serM  = line.match(/[A-Z]{4}[0-9A-F]{8,}/i);
+-    const nameM = line.match(/name[:\s]+(\S+)/i);
+-    const vlanM = line.match(/vlan[:\s-]+(\d+)/i);
+-    const sigM  = line.match(/([-\d.]+)\s*dBm/i);
+-    const ponM  = line.match(/gpon\s+([\d/]+)/i) || line.match(/(\d+\/\d+\/\d+)/);
+-
+-    if (onuM) {
+-      if (cur) onus.push(cur);
+-      cur = {
+-        id:     onuM[1],
+-        name:   nameM?.[1] ?? null,
+-        status: statM?.[1]?.toLowerCase() ?? "unknown",
+-        serial: serM?.[0]?.toUpperCase() ?? null,
+-        vlan:   vlanM?.[1] ?? null,
+-        signal: sigM ? `${sigM[1]} dBm` : null,
+-        pon:    ponM ? (ponM[1] ?? ponM[0]) : null,
+-      };
+-    } else if (cur) {
+-      if (statM && cur.status === "unknown") cur.status = statM[1].toLowerCase();
+-      if (serM  && !cur.serial) cur.serial = serM[0].toUpperCase();
+-      if (nameM && !cur.name)   cur.name   = nameM[1];
+-      if (vlanM && !cur.vlan)   cur.vlan   = vlanM[1];
+-      if (sigM  && !cur.signal) cur.signal = `${sigM[1]} dBm`;
+-      if (ponM  && !cur.pon)    cur.pon    = ponM[1] ?? ponM[0];
+-    }
+-  }
+-  if (cur) onus.push(cur);
+-
+-  if (!onus.length) {
+-    container.innerHTML = `<div class="noc-empty" style="grid-column:1/-1;">${formatOutput(text)}</div>`;
+-    return;
+-  }
+-
+-  container.innerHTML = onus.map(onu => {
+-    const online  = /up|online|active/.test(onu.status);
+-    const offline = /down|offline|inactive/.test(onu.status);
+-    const sigRaw  = onu.signal ? parseFloat(onu.signal) : NaN;
+-    const sigCol  = isNaN(sigRaw) ? C.dim : sigRaw > -25 ? C.success : sigRaw > -30 ? C.warning : C.danger;
+-    const stColor = online ? C.success : offline ? C.danger : C.muted;
+-
+-    return `
+-      <div class="noc-card status-${online ? "up" : offline ? "down" : ""}">
+-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+-          <div>
+-            <div style="font-size:10px;font-weight:700;color:${C.accent};">ONU ${onu.id}</div>
+-            ${onu.name ? `<div style="font-size:9px;color:${C.dim};margin-top:1px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${onu.name}</div>` : ""}
+-          </div>
+-          ${statusBadge(online ? "Up" : offline ? "Down" : onu.status)}
+-        </div>
+-        <div style="display:flex;flex-direction:column;gap:2px;">
+-          ${onu.serial ? `<div class="noc-kv"><span class="noc-label">Serial</span><span class="noc-value" style="color:${C.warning};">${onu.serial}</span></div>` : ""}
+-          ${onu.pon    ? `<div class="noc-kv"><span class="noc-label">PON</span><span class="noc-value" style="color:${C.text};">${onu.pon}</span></div>` : ""}
+-          ${onu.vlan   ? `<div class="noc-kv"><span class="noc-label">VLAN</span><span class="noc-value" style="color:${C.accent};">${onu.vlan}</span></div>` : ""}
+-          ${onu.signal ? `<div class="noc-kv"><span class="noc-label">Sinal</span><span class="noc-value" style="color:${sigCol};">${onu.signal}</span></div>` : ""}
+-        </div>
+-      </div>`;
+-  }).join("");
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — ONU STATUS
+-// ─────────────────────────────────────────────────────────────
+-
+-async function loadONUs(e = null) {
+-  const btn       = e?.target?.closest("button") ?? null;
+-  const container = document.getElementById("onu-output");
+-  if (btn) setLoading(btn, true);
+-  gridLoading(container, "Buscando ONUs...");
+-
+-  try {
+-    const olt = getSelectedOlt();
+-    const res  = await fetch(`${API}/onu/status/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt }),
+-    });
+-    const data = await res.json();
+-    data.error
+-      ? gridError(container, data.error)
+-      : parseOLTToCards(data.output, container);
+-  } catch {
+-    gridError(container, "Erro ao carregar ONUs. API offline?");
+-    showToast("Erro ao carregar ONUs", "error");
+-  }
+-
+-  if (btn) setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — DISCOVERED
+-// ─────────────────────────────────────────────────────────────
+-
+-async function loadDiscovered(e) {
+-  const btn       = e.target.closest("button");
+-  const container = document.getElementById("disc-output");
+-  setLoading(btn, true);
+-  gridLoading(container, "Buscando dispositivos...");
+-
+-  try {
+-    const olt = document.getElementById("disc-olt").value;
+-    const res  = await fetch(`${API}/onu/discovered/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt }),
+-    });
+-    const data = await res.json();
+-    data.error
+-      ? gridError(container, data.error)
+-      : parseONUsToCards(data.output, container);
+-  } catch {
+-    gridError(container, "Erro ao buscar ONUs descobertas.");
+-    showToast("Erro ao buscar ONUs", "error");
+-  }
+-  setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — DISCOVERED PANEL (painel lateral da página Ativar)
+-// ─────────────────────────────────────────────────────────────
+-
+-async function refreshDiscoveredPanel(e) {
+-  if (e) {
+-    const btn = e.target.closest("button");
+-    setLoading(btn, true);
+-    setTimeout(() => setLoading(btn, false), 3500);
+-  }
+-
+-  const container = document.getElementById("act-disc-list");
+-  if (!container) return;
+-  const olt = document.getElementById("act-olt")?.value;
+-  if (!olt) return;
+-
+-  container.innerHTML = `<div class="noc-loading"><span class="noc-spinner"></span><span style="font-size:10px;">Buscando em ${olt}...</span></div>`;
+-
+-  try {
+-    const res  = await fetch(`${API}/onu/discovered/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt }),
+-    });
+-    const data = await res.json();
+-    parseDiscoveredToPanel(data.output ?? data.error, container, olt);
+-  } catch {
+-    container.innerHTML = `<div class="noc-empty" style="color:${C.danger};"><p>Erro ao buscar.<br>API offline?</p></div>`;
+-  }
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — ONU INFO
+-// ─────────────────────────────────────────────────────────────
+-
+-async function getSignal(olt, pon, id) {
+-  const box = document.getElementById("signal-detail-box");
+-  if (!box) return;
+-
+-  box.innerHTML = `<div class="noc-loading"><span class="noc-spinner"></span><span>Consultando ONU ${id}...</span></div>`;
+-
+-  const sinalEl = document.getElementById("onu-sinal");
+-  if (sinalEl) { sinalEl.textContent = "..."; sinalEl.style.color = C.dim; }
+-
+-  try {
+-    const res  = await fetch(`${API}/onu/info/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt, pon, onu_id: parseInt(id) }),
+-    });
+-    const data = await res.json();
+-
+-    if (data.error && !data.detail) {
+-      box.innerHTML = `<p style="color:${C.danger};font-size:11px;font-family:'JetBrains Mono',monospace;">${data.error}</p>`;
+-      return;
+-    }
+-
+-    const detail  = data.detail  || {};
+-    const service = data.service || {};
+-
+-    if (sinalEl) {
+-      const rx = parseFloat(detail.rx_power);
+-      sinalEl.textContent = detail.rx_power ? `${detail.rx_power} dBm` : "N/A";
+-      sinalEl.style.color = isNaN(rx) ? C.dim : rx >= -25 ? C.success : rx >= -28 ? C.warning : C.danger;
+-    }
+-
+-    box.innerHTML = renderOnuDetailPanel(detail, service, pon, id, olt);
+-
+-  } catch (err) {
+-    console.error("[getSignal]", err);
+-    box.innerHTML = `<p style="color:${C.danger};font-size:11px;font-family:'JetBrains Mono',monospace;">Erro de conexão com a API.</p>`;
+-  }
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// RENDER — bloco IPv4
+-// ─────────────────────────────────────────────────────────────
+-
+-function renderIpv4Block(ipv4) {
+-  if (!ipv4) return "";
+-
+-  const row = (label, value, color = C.text) => value ? `
+-    <div class="detail-row">
+-      <span class="detail-label">${label}</span>
+-      <span class="detail-value" style="color:${color};">${value}</span>
+-    </div>` : "";
+-
+-  if (ipv4.configured) {
+-    return `
+-      <div style="margin-top:8px;padding:8px 10px;border-radius:6px;
+-                  border:1px solid ${C.success}33;background:${C.success}0d;">
+-        <div style="font-size:9px;font-weight:700;color:${C.success};text-transform:uppercase;
+-                    letter-spacing:.06em;margin-bottom:5px;">● IPv4 — OLT</div>
+-        ${row("Endereço", ipv4.address, C.success)}
+-        ${row("Gateway",  ipv4.gateway)}
+-        ${row("VLAN",     ipv4.vlan,    C.accent)}
+-        ${ipv4.mode && ipv4.mode !== "Not configured" ? row("Modo", ipv4.mode, C.dim) : ""}
+-      </div>`;
+-  }
+-
+-  if (ipv4.source === "pppoe_bras") {
+-    return `
+-      <div style="margin-top:8px;padding:8px 10px;border-radius:6px;
+-                  border:1px solid ${C.accent}33;background:${C.accent}0d;">
+-        <div style="font-size:9px;font-weight:700;color:${C.accent};text-transform:uppercase;
+-                    letter-spacing:.06em;margin-bottom:4px;">◎ IPv4 — PPPoE / BRAS</div>
+-        <div style="font-size:10px;color:${C.dim};line-height:1.5;font-family:'JetBrains Mono',monospace;">
+-          ${ipv4.note || "IP via PPPoE pelo BRAS — não visível na OLT."}
+-        </div>
+-      </div>`;
+-  }
+-
+-  return `
+-    <div style="margin-top:8px;padding:8px 10px;border-radius:6px;border:1px solid ${C.border};">
+-      <div style="font-size:9px;font-weight:700;color:${C.dim};text-transform:uppercase;
+-                  letter-spacing:.06em;margin-bottom:4px;">○ IPv4</div>
+-      <div style="font-size:10px;color:${C.dim};font-family:'JetBrains Mono',monospace;">
+-        ${ipv4.note || "Nenhum IP configurado na OLT."}
+-      </div>
+-    </div>`;
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// RENDER — painel de detalhes completo da ONU
+-// ─────────────────────────────────────────────────────────────
+-
+-function renderOnuDetailPanel(onu, service, ponId, onuId, olt) {
+-
+-  const statusColor = onu.status?.toLowerCase() === "up" ? C.success : C.danger;
+-
+-  const row = (label, value, color = C.text) => value ? `
+-    <div class="detail-row">
+-      <span class="detail-label">${label}</span>
+-      <span class="detail-value" style="color:${color};">${value}</span>
+-    </div>` : "";
+-
+-  const sessions = service.pppoe_sessions ?? [];
+-  const pppoeHtml = sessions.length
+-    ? sessions.map(s => `
+-        ${row("Session ID", s.session_id, C.success)}
+-        ${row("MAC", s.mac, C.warning)}`).join("")
+-    : `<div class="detail-row">
+-         <span class="detail-label">PPPoE</span>
+-         <span class="detail-value" style="color:${C.danger};">Sem sessão ativa</span>
+-       </div>`;
+-
+-  const vlans = service.vlans ?? [];
+-
+-  return `
+-    <div style="font-family:'JetBrains Mono',monospace;">
+-
+-      <!-- cabeçalho -->
+-      <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid ${C.border};">
+-        <div style="font-size:9px;color:${C.dim};margin-bottom:3px;">PON ${ponId} · ONU ${onuId}</div>
+-        <div style="font-size:13px;font-weight:700;color:${C.warning};word-break:break-all;">
+-          ${onu.serial ?? "—"}
+-        </div>
+-        ${onu.name && onu.name !== "—"
+-          ? `<div style="font-size:9px;color:${C.success};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${onu.name}</div>`
+-          : ""}
+-      </div>
+-
+-      <!-- sinais ópticos (2 col) -->
+-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+-        <div style="background:${C.bgLow};border-radius:6px;padding:8px;border:1px solid ${C.border};text-align:center;">
+-          <div style="font-size:9px;color:${C.dim};text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">Rx ↓</div>
+-          <div style="font-size:15px;font-weight:700;color:${dbmColor(onu.rx_power)};">
+-            ${onu.rx_power ?? "—"}
+-          </div>
+-          ${onu.rx_power ? `<div style="font-size:8px;color:${C.dim};">dBm</div>` : ""}
+-        </div>
+-        <div style="background:${C.bgLow};border-radius:6px;padding:8px;border:1px solid ${C.border};text-align:center;">
+-          <div style="font-size:9px;color:${C.dim};text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">RSS ↑</div>
+-          <div style="font-size:15px;font-weight:700;color:${dbmColor(onu.rss_power)};">
+-            ${onu.rss_power ?? "—"}
+-          </div>
+-          ${onu.rss_power ? `<div style="font-size:8px;color:${C.dim};">dBm</div>` : ""}
+-        </div>
+-      </div>
+-
+-      <!-- dados da ONU -->
+-      <div style="margin-bottom:8px;">
+-        ${row("Status",    onu.status,   statusColor)}
+-        ${row("Uptime",    onu.uptime)}
+-        ${row("Tx Power",  onu.tx_power ? `${onu.tx_power} dBm` : null, C.accent)}
+-        ${row("Perfil",    onu.profile)}
+-        ${row("Distância", onu.distance ? `${onu.distance} km` : null)}
+-        ${row("Vendor",    onu.vendor)}
+-        ${row("Equipment", onu.equipment)}
+-        ${row("FW Ativo",  onu.active_fw)}
+-        ${row("FW Standby",onu.standby_fw)}
+-        ${row("Versão",    onu.version)}
+-        ${row("FEC",       onu.fec)}
+-        ${row("Banda",     onu.bandwidth)}
+-      </div>
+-
+-      <!-- IPv4 -->
+-      ${renderIpv4Block(onu.ipv4)}
+-
+-      <!-- serviço -->
+-      <div style="margin-top:8px;padding-top:8px;border-top:1px solid ${C.border};">
+-        <div style="font-size:9px;color:${C.dim};text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Serviço</div>
+-        ${row("Service Port", service.service_port, C.accent)}
+-        ${row("VLANs", vlans.length ? vlans.join(" · ") : null, C.warning)}
+-        ${pppoeHtml}
+-        <div style="font-size:9px;color:${C.dim};margin-top:5px;line-height:1.4;">
+-          💡 IP do cliente está no BRAS/BNG, não na OLT.
+-        </div>
+-      </div>
+-
+-      <!-- botão reboot -->
+-      <div style="margin-top:12px;">
+-        <button class="btn-reboot" onclick="rebootONU('${olt}','${ponId}','${onuId}',this)">
+-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+-            <polyline points="23 4 23 10 17 10"/>
+-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+-          </svg>
+-          Reiniciar ONU
+-        </button>
+-      </div>
+-    </div>`;
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — ONU ACTIVATE
+-// ─────────────────────────────────────────────────────────────
+-
+-async function activateONU(e) {
+-  const btn = e.target.closest("button");
+-  setLoading(btn, true);
+-
+-  const get = id => document.getElementById(id)?.value?.trim() ?? "";
+-  const payload = {
+-    olt:          get("act-olt"),
+-    pon:          get("act-pon"),
+-    onu_id:       parseInt(get("act-id")),
+-    serial:       get("act-serial"),
+-    name:         get("act-name"),
+-    vlan:         parseInt(get("act-vlan")),
+-    profile:      get("act-profile"),
+-    service_port: parseInt(get("act-service")),
+-  };
+-
+-  if (!payload.pon || !payload.serial || !payload.name ||
+-      isNaN(payload.onu_id) || isNaN(payload.vlan) || isNaN(payload.service_port)) {
+-    showToast("Preencha todos os campos obrigatórios", "error");
+-    setLoading(btn, false);
+-    return;
+-  }
+-
+-  const outEl = document.getElementById("act-output");
+-  try {
+-    const res  = await fetch(`${API}/onu/activate/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify(payload),
+-    });
+-    const data = await res.json();
+-    if (outEl) {
+-      outEl.style.display = "block";
+-      outEl.innerHTML = formatOutput(data.output ?? data.error);
+-    }
+-    data.error
+-      ? showToast("Erro na ativação: " + data.error.slice(0, 60), "error")
+-      : showToast("ONU ativada com sucesso!");
+-    if (!data.error) setTimeout(() => refreshDiscoveredPanel(), 2500);
+-  } catch {
+-    if (outEl) { outEl.style.display = "block"; outEl.innerHTML = `<span style="color:${C.danger};">Erro de conexão com a API.</span>`; }
+-    showToast("Erro ao ativar ONU", "error");
+-  }
+-  setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — ONU DELETE
+-// ─────────────────────────────────────────────────────────────
+-
+-async function deleteONU(e) {
+-  const btn = e.target.closest("button");
+-
+-  const get = id => document.getElementById(id)?.value?.trim() ?? "";
+-  const payload = {
+-    olt:          get("del-olt"),
+-    pon:          get("del-pon"),
+-    onu_id:       parseInt(get("del-id")),
+-    serial:       get("del-serial"),
+-    service_port: parseInt(get("del-service")),
+-  };
+-
+-  if (!payload.pon || isNaN(payload.onu_id) || isNaN(payload.service_port)) {
+-    showToast("Preencha PON, ONU ID e Service Port", "error");
+-    return;
+-  }
+-
+-  setLoading(btn, true);
+-  const outEl = document.getElementById("del-output");
+-
+-  try {
+-    const res  = await fetch(`${API}/onu/delete/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify(payload),
+-    });
+-    const data = await res.json();
+-    if (outEl) {
+-      outEl.style.display = "block";
+-      outEl.innerHTML = formatOutput(data.output ?? data.error);
+-    }
+-    data.error
+-      ? showToast("Erro ao deletar: " + data.error.slice(0, 60), "error")
+-      : showToast("ONU deletada com sucesso");
+-  } catch {
+-    if (outEl) { outEl.style.display = "block"; outEl.innerHTML = `<span style="color:${C.danger};">Erro de conexão com a API.</span>`; }
+-    showToast("Erro ao deletar ONU", "error");
+-  }
+-  setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — LOAD ONUs TO DELETE
+-// ─────────────────────────────────────────────────────────────
+-
+-async function loadONUsToDelete(e) {
+-  const btn       = e.target.closest("button");
+-  const container = document.getElementById("del-list");
+-  if (!container) return;
+-
+-  const olt = document.getElementById("del-olt")?.value;
+-  if (!olt) { showToast("Selecione uma OLT", "error"); return; }
+-
+-  setLoading(btn, true);
+-  container.innerHTML = `<div class="noc-loading"><span class="noc-spinner"></span><span style="font-size:10px;">Buscando em ${olt}...</span></div>`;
+-
+-  try {
+-    const res  = await fetch(`${API}/onu/status/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt }),
+-    });
+-    const data = await res.json();
+-    data.error
+-      ? (container.innerHTML = `<div class="noc-empty" style="color:${C.danger};"><p>${data.error}</p></div>`)
+-      : renderDeleteCards(data.output, container);
+-  } catch {
+-    container.innerHTML = `<div class="noc-empty" style="color:${C.danger};"><p>Erro ao conectar com API</p></div>`;
+-    showToast("Erro ao carregar ONUs", "error");
+-  }
+-  setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// API — REBOOT ONU
+-// ─────────────────────────────────────────────────────────────
+-
+-async function rebootONU(olt, pon, id, btn) {
+-  if (!confirm(`Reiniciar ONU ${id} na PON ${pon}?\nO cliente ficará sem conexão por ~1 min.`)) return;
+-
+-  setLoading(btn, true);
+-  try {
+-    const res  = await fetch(`${API}/onu/reboot/`, {
+-      method:  "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body:    JSON.stringify({ olt, pon, onu_id: parseInt(id) }),
+-    });
+-    const data = await res.json();
+-    data.error
+-      ? showToast("Erro ao reiniciar: " + data.error.slice(0, 60), "error")
+-      : showToast(`ONU ${id} reiniciada com sucesso!`);
+-    if (!data.error) setTimeout(() => getSignal(olt, pon, id), 5000);
+-  } catch {
+-    showToast("Erro de conexão ao reiniciar", "error");
+-  }
+-  setLoading(btn, false);
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// ACTIVATE PAGE — handler troca de OLT
+-// ─────────────────────────────────────────────────────────────
+-
+-function onActOltChange() {
+-  const olt  = document.getElementById("act-olt")?.value;
+-  const meta = OLT_META[olt] ?? {};
+-  const hint = document.getElementById("act-olt-hint");
+-
+-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ""; };
+-  set("act-vlan",    meta.vlan);
+-  set("act-profile", meta.profile);
+-
+-  if (hint) {
+-    if (meta.hint) {
+-      hint.style.display = "flex";
+-      hint.innerHTML = `
+-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="${C.accent}" stroke-width="2">
+-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+-        </svg>
+-        ${meta.hint}`;
+-    } else {
+-      hint.style.display = "none";
+-    }
+-  }
+-  refreshDiscoveredPanel();
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// TERMINAL
+-// ─────────────────────────────────────────────────────────────
+-
+-function updateTermLabel() {
+-  const olt   = document.getElementById("term-olt")?.value;
+-  const label = document.getElementById("term-label");
+-  if (label && olt) label.textContent = `noc@datacom ~ ${OLT_LABELS[olt] || olt}`;
+-}
+-
+-function clearTerminal() {
+-  const log = document.getElementById("terminal-log");
+-  if (log) log.innerHTML = `
+-    <div style="color:${C.success};font-size:11px;font-family:'JetBrains Mono',monospace;">Terminal limpo.</div>
+-    <div style="color:${C.dim};font-size:11px;">──────────────────────────────────────</div>`;
+-}
+-
+-function initTerminal() {
+-  const input = document.getElementById("terminal-input");
+-  if (!input) return;
+-
+-  input.addEventListener("keypress", async (e) => {
+-    if (e.key !== "Enter") return;
+-    const log = document.getElementById("terminal-log");
+-    const cmd = e.target.value.trim();
+-    if (!cmd) return;
+-
+-    const olt = document.getElementById("term-olt")?.value || "KM70";
+-
+-    log.innerHTML += `
+-      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;margin:2px 0;">
+-        <span style="color:${C.success};">[${olt}]</span>
+-        <span style="color:${C.accent};margin:0 6px;">❯</span>
+-        <span style="color:${C.text};">${cmd.replace(/</g, "&lt;")}</span>
+-      </div>`;
+-    e.target.value = "";
+-    log.scrollTop = log.scrollHeight;
+-
+-    try {
+-      const res  = await fetch(`${API}/olt/terminal/`, {
+-        method:  "POST",
+-        headers: { "Content-Type": "application/json" },
+-        body:    JSON.stringify({ olt, command: cmd }),
+-      });
+-      const data = await res.json();
+-      const out  = data.output ?? data.error ?? "Sem resposta";
+-      log.innerHTML += `<div style="white-space:pre-wrap;color:${C.dim};font-size:11px;font-family:'JetBrains Mono',monospace;margin:2px 0 6px;">${formatOutput(out)}</div>`;
+-    } catch {
+-      log.innerHTML += `<div style="color:${C.danger};font-size:11px;font-family:'JetBrains Mono',monospace;">✗ Erro de conexão com a API</div>`;
+-    }
+-    log.scrollTop = log.scrollHeight;
+-  });
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// DASHBOARD
+-// ─────────────────────────────────────────────────────────────
+-
+-async function checkOLTHealth(name) {
+-  const el = document.getElementById(`olt-badge-${name}`);
+-  if (!el) return;
+-  try {
+-    const res  = await fetch(`${API}/health/${name}/`);
+-    const data = await res.json();
+-    const online = data.online;
+-    const color  = online ? C.success : C.danger;
+-    const label  = online ? "Online" : "Offline";
+-    el.style.cssText = `
+-      display:inline-flex;align-items:center;gap:5px;
+-      padding:2px 8px;border-radius:999px;
+-      font-size:10px;font-weight:700;text-transform:uppercase;
+-      font-family:'JetBrains Mono',monospace;
+-      background:${color}18;color:${color};border:1px solid ${color}33;`;
+-    el.innerHTML = `<span style="width:5px;height:5px;border-radius:50%;background:${color};display:inline-block;${online ? `box-shadow:0 0 4px ${color}88;` : ""}"></span>${label}`;
+-  } catch {
+-    el.style.cssText = `display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:10px;font-family:'JetBrains Mono',monospace;background:${C.dim}18;color:${C.dim};border:1px solid ${C.dim}33;`;
+-    el.textContent = "Erro";
+-  }
+-}
+-
+-async function dashRefresh() {
+-  const olts = Object.keys(OLT_LABELS);
+-
+-  // ── indicador visual de carregando nos contadores
+-  const onlineEl = document.getElementById("dash-online");
+-  const alertsEl = document.getElementById("dash-alerts");
+-  const totalEl  = document.getElementById("dash-total");
+-  if (onlineEl) onlineEl.textContent = "…";
+-  if (alertsEl) alertsEl.textContent = "…";
+-  if (totalEl)  totalEl.textContent  = "…";
+-
+-  // ── busca todas as OLTs em paralelo
+-  const results = await Promise.allSettled(
+-    olts.map(olt =>
+-      fetch(`${API}/onu/status/`, {
+-        method:  "POST",
+-        headers: { "Content-Type": "application/json" },
+-        body:    JSON.stringify({ olt }),
+-      })
+-      .then(r => r.json())
+-      .then(data => {
+-        const output  = data.output ?? "";
+-        const online  = (output.match(/\bup\b/gi)   || []).length;
+-        const offline = (output.match(/\bdown\b/gi) || []).length;
+-        return { olt, online, offline, ok: !data.error };
+-      })
+-      .catch(() => ({ olt, online: 0, offline: 0, ok: false }))
+-    )
+-  );
+-
+-  // ── soma totais
+-  let totalOnline = 0, totalOffline = 0;
+-  for (const r of results) {
+-    if (r.status === "fulfilled") {
+-      totalOnline  += r.value.online;
+-      totalOffline += r.value.offline;
+-    }
+-  }
+-  const total = totalOnline + totalOffline;
+-
+-  if (onlineEl) onlineEl.textContent = totalOnline;
+-  if (alertsEl) alertsEl.textContent = totalOffline;
+-  if (totalEl)  totalEl.textContent  = total;
+-
+-  // ── atualiza badge por OLT com breakdown individual
+-  results.forEach(r => {
+-    if (r.status !== "fulfilled") return;
+-    const { olt, online, offline } = r.value;
+-    const badge = document.getElementById(`olt-count-${olt}`);
+-    if (badge) {
+-      badge.textContent = `↑${online} ↓${offline}`;
+-      badge.style.color = offline > 0 ? C.warning : C.success;
+-    }
+-  });
+-
+-  // ── health check de cada OLT
+-  olts.forEach(checkOLTHealth);
+-
+-  const syncEl = document.getElementById("last-sync");
+-  if (syncEl) syncEl.textContent = new Date().toLocaleTimeString("pt-BR");
+-}
+-
+-// ─────────────────────────────────────────────────────────────
+-// AUTO-INIT — search listener quando o DOM estiver pronto
+-// ─────────────────────────────────────────────────────────────
+-document.addEventListener("DOMContentLoaded", initONUSearch);
+\ No newline at end of file
++/**
++ * NOC DATACOM — bootstrap
++ *
++ * O código principal foi dividido em módulos clássicos carregados pelos templates:
++ * - noc/config.js
++ * - noc/ui.js
++ * - noc/parsers.js
++ * - noc/pages.js
++ */
++"use strict";
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/web/templates/activate.html datacom_work/Datacom/web/templates/activate.html
+--- orig_datacom/Datacom/web/templates/activate.html	2026-04-26 08:07:14.000000000 +0000
++++ datacom_work/Datacom/web/templates/activate.html	2026-05-24 05:41:22.649539671 +0000
+@@ -179,6 +179,10 @@
+   </div>
+ </main>
+ 
++<script src="{% static 'script/noc/config.js' %}"></script>
++<script src="{% static 'script/noc/ui.js' %}"></script>
++<script src="{% static 'script/noc/parsers.js' %}"></script>
++<script src="{% static 'script/noc/pages.js' %}"></script>
+ <script src="{% static 'script/noc.js' %}"></script>
+ <script>document.addEventListener('DOMContentLoaded', () => markActive('activate'));</script>
+ </body>
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/web/templates/dashboard.html datacom_work/Datacom/web/templates/dashboard.html
+--- orig_datacom/Datacom/web/templates/dashboard.html	2026-04-26 10:56:58.000000000 +0000
++++ datacom_work/Datacom/web/templates/dashboard.html	2026-05-24 05:41:22.649898692 +0000
+@@ -137,6 +137,10 @@
+   </div>
+ </main>
+ 
++<script src="{% static 'script/noc/config.js' %}"></script>
++<script src="{% static 'script/noc/ui.js' %}"></script>
++<script src="{% static 'script/noc/parsers.js' %}"></script>
++<script src="{% static 'script/noc/pages.js' %}"></script>
+ <script src="{% static 'script/noc.js' %}"></script>
+ <script>
+ document.addEventListener("DOMContentLoaded", () => {
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/web/templates/delete.html datacom_work/Datacom/web/templates/delete.html
+--- orig_datacom/Datacom/web/templates/delete.html	2026-04-26 08:10:19.000000000 +0000
++++ datacom_work/Datacom/web/templates/delete.html	2026-05-24 05:41:22.650098823 +0000
+@@ -145,6 +145,10 @@
+   </div>
+ </main>
+ 
++<script src="{% static 'script/noc/config.js' %}"></script>
++<script src="{% static 'script/noc/ui.js' %}"></script>
++<script src="{% static 'script/noc/parsers.js' %}"></script>
++<script src="{% static 'script/noc/pages.js' %}"></script>
+ <script src="{% static 'script/noc.js' %}"></script>
+ <script>document.addEventListener('DOMContentLoaded', () => markActive('delete'));</script>
+ </body>
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/web/templates/discovered.html datacom_work/Datacom/web/templates/discovered.html
+--- orig_datacom/Datacom/web/templates/discovered.html	2026-04-26 08:10:54.000000000 +0000
++++ datacom_work/Datacom/web/templates/discovered.html	2026-05-24 05:41:22.650353825 +0000
+@@ -100,6 +100,10 @@
+   </div>
+ </main>
+ 
++<script src="{% static 'script/noc/config.js' %}"></script>
++<script src="{% static 'script/noc/ui.js' %}"></script>
++<script src="{% static 'script/noc/parsers.js' %}"></script>
++<script src="{% static 'script/noc/pages.js' %}"></script>
+ <script src="{% static 'script/noc.js' %}"></script>
+ <script>document.addEventListener('DOMContentLoaded', () => markActive('discovered'));</script>
+ </body>
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/web/templates/signal.html datacom_work/Datacom/web/templates/signal.html
+--- orig_datacom/Datacom/web/templates/signal.html	2026-04-26 09:51:57.000000000 +0000
++++ datacom_work/Datacom/web/templates/signal.html	2026-05-24 05:41:22.650608163 +0000
+@@ -277,7 +277,11 @@
+     </div>
+   </main>
+ 
+-  <script src="{% static 'script/noc.js' %}"></script>
++  <script src="{% static 'script/noc/config.js' %}"></script>
++<script src="{% static 'script/noc/ui.js' %}"></script>
++<script src="{% static 'script/noc/parsers.js' %}"></script>
++<script src="{% static 'script/noc/pages.js' %}"></script>
++<script src="{% static 'script/noc.js' %}"></script>
+   <script>
+     document.addEventListener("DOMContentLoaded", () => {
+       markActive("signal");
+diff -ru '--exclude=.git' '--exclude=__pycache__' '--exclude=*.pyc' orig_datacom/Datacom/web/templates/terminal.html datacom_work/Datacom/web/templates/terminal.html
+--- orig_datacom/Datacom/web/templates/terminal.html	2026-04-26 08:11:09.000000000 +0000
++++ datacom_work/Datacom/web/templates/terminal.html	2026-05-24 05:41:22.651155620 +0000
+@@ -147,6 +147,10 @@
+   </div>
+ </main>
+ 
++<script src="{% static 'script/noc/config.js' %}"></script>
++<script src="{% static 'script/noc/ui.js' %}"></script>
++<script src="{% static 'script/noc/parsers.js' %}"></script>
++<script src="{% static 'script/noc/pages.js' %}"></script>
+ <script src="{% static 'script/noc.js' %}"></script>
+ <script>
+ document.addEventListener("DOMContentLoaded", () => {

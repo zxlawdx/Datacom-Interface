@@ -1,0 +1,16 @@
+# ambiente virtual
+venv/
+.venv/
+
+# cache python
+__pycache__/
+*.pyc
+
+# env configs
+.env
+
+# logs
+*.log
+
+# sistema
+.DS_Store

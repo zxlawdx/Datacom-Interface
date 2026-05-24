@@ -1,0 +1,12 @@
+asgiref==3.11.1
+bcrypt==5.0.0
+cffi==2.0.0
+cryptography==46.0.7
+Django==6.0.4
+djangorestframework==3.17.1
+invoke==3.0.3
+paramiko==4.0.0
+pycparser==3.0
+PyNaCl==1.6.2
+sqlparse==0.5.5
+tzdata==2026.1

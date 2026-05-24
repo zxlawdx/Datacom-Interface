@@ -1,0 +1,155 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br" class="dark">
+<head>
+  {% include "partials/base_head.html" with title="Deletar ONU" %}
+  <style>
+    .disc-card {
+      background: #171f33; border: 1px solid #2a2d3a; border-radius: 10px;
+      padding: 12px; cursor: pointer; transition: border-color .15s;
+    }
+    .disc-card:hover { border-color: #ffb4ab; }
+    .kv { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .loading-state { display: flex; align-items: center; justify-content: center; gap: 10px;
+                     padding: 40px; color: #64748b; font-size: 12px; }
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center;
+                   gap: 10px; padding: 40px 20px; color: #64748b; font-size: 12px; text-align: center; }
+    .output-box { font-family: 'JetBrains Mono', monospace; font-size: 11px;
+                  background: #060e20; border: 1px solid #2a2d3a; border-radius: 8px;
+                  padding: 12px; line-height: 1.8; }
+    .btn-spinner { display: inline-block; width: 11px; height: 11px;
+                   border: 1.5px solid #2a2d3a; border-top-color: currentColor;
+                   border-radius: 50%; animation: spin .8s linear infinite; }
+    .hidden { display: none !important; }
+    @media (min-width: 768px) {
+      .noc-sidebar  { display: flex !important; }
+      .noc-main     { margin-left: 16rem; }
+      .noc-header   { width: calc(100% - 16rem); }
+    }
+  </style>
+</head>
+<body class="bg-surface text-text-primary font-sans min-h-screen">
+
+{% include "partials/sidebar.html" with active="delete" %}
+
+<header class="noc-header fixed top-0 right-0 w-full z-40
+               bg-surface-lo/80 backdrop-blur-xl border-b border-border
+               flex items-center justify-between px-6 h-14">
+  <h1 class="font-sans font-black text-accent text-xs uppercase tracking-widest">OLT DATACOM</h1>
+</header>
+
+<main class="noc-main pt-14 pb-20 md:pb-8 min-h-screen">
+  <div class="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+
+    <div>
+      <h2 class="font-bold text-2xl tracking-tight">Deletar ONU</h2>
+      <p class="text-sm text-text-dim mt-0.5">Desprovisionamento de ONU da rede</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-6">
+
+      <!-- ── FORMULÁRIO ─────────────────────────────── -->
+      <div class="space-y-5">
+
+        <!-- OLT -->
+        <div class="bg-surface-mid rounded-xl border border-border p-5 space-y-4">
+          <h3 class="text-[10px] font-bold uppercase tracking-widest text-text-dim">OLT de Destino</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <label class="text-[10px] uppercase tracking-widest text-text-dim font-bold">OLT</label>
+              <select id="del-olt"
+                      class="w-full bg-surface-lowest border border-border rounded-lg px-3 py-2.5
+                             text-sm font-mono text-text-primary focus:ring-1 focus:ring-accent outline-none">
+                {% for olt in olts %}<option value="{{ olt.name }}">{{ olt.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-[10px] uppercase tracking-widest text-text-dim font-bold">PON</label>
+              <input id="del-pon" placeholder="ex: 1/1/3"
+                     class="w-full bg-surface-lowest border border-border rounded-lg px-3 py-2.5
+                            text-sm font-mono text-text-primary placeholder:text-text-dim
+                            focus:ring-1 focus:ring-accent outline-none"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dados da ONU -->
+        <div class="bg-surface-mid rounded-xl border border-border p-5 space-y-4">
+          <h3 class="text-[10px] font-bold uppercase tracking-widest text-text-dim">Dados da ONU</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <label class="text-[10px] uppercase tracking-widest text-text-dim font-bold">ONU ID</label>
+              <input id="del-id" type="number" placeholder="ex: 31"
+                     class="w-full bg-surface-lowest border border-border rounded-lg px-3 py-2.5
+                            text-sm font-mono text-text-primary placeholder:text-text-dim
+                            focus:ring-1 focus:ring-accent outline-none"/>
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-[10px] uppercase tracking-widest text-text-dim font-bold">Serial Number</label>
+              <input id="del-serial" placeholder="ex: FHTT06C3C130"
+                     oninput="this.value=this.value.toUpperCase()"
+                     class="w-full bg-surface-lowest border border-border rounded-lg px-3 py-2.5
+                            text-sm font-mono text-text-primary placeholder:text-text-dim
+                            focus:ring-1 focus:ring-accent outline-none"/>
+            </div>
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase tracking-widest text-text-dim font-bold">Service Port</label>
+            <input id="del-service" type="number" placeholder="ex: 302"
+                   class="w-full bg-surface-lowest border border-border rounded-lg px-3 py-2.5
+                          text-sm font-mono text-text-primary placeholder:text-text-dim
+                          focus:ring-1 focus:ring-accent outline-none"/>
+          </div>
+        </div>
+
+        <!-- Aviso -->
+        <div class="flex items-start gap-3 bg-danger/5 border border-danger/25 rounded-xl px-4 py-3 text-sm text-danger">
+          <span class="material-symbols-outlined text-base mt-0.5 shrink-0">warning</span>
+          <span>Esta ação é irreversível. A ONU será completamente desprovisionada.</span>
+        </div>
+
+        <!-- Botão -->
+        <button onclick="deleteONU(event)"
+                class="w-full flex items-center justify-center gap-2 py-3 rounded-xl
+                       bg-danger/15 text-danger border border-danger/30 font-bold text-sm uppercase tracking-widest
+                       hover:bg-danger/25 active:scale-[0.98] transition-all">
+          <span class="material-symbols-outlined text-base">delete_forever</span>
+          Deletar ONU
+        </button>
+
+        <div id="del-output" class="output-box hidden"></div>
+      </div>
+
+      <!-- ── PAINEL LATERAL ─────────────────────────── -->
+      <div class="bg-surface-mid rounded-xl border border-border overflow-hidden h-fit sticky top-20">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div>
+            <p class="text-xs font-bold text-danger">ONUs Provisionadas</p>
+            <p class="text-[10px] text-text-dim mt-0.5">Clique para preencher</p>
+          </div>
+          <button onclick="loadONUsToDelete(event)"
+                  class="w-7 h-7 flex items-center justify-center rounded-lg
+                         text-text-dim hover:text-accent hover:bg-surface-hi transition-all">
+            <span class="material-symbols-outlined text-base">refresh</span>
+          </button>
+        </div>
+        <div id="del-list" class="p-3 space-y-2 max-h-[60vh] overflow-y-auto">
+          <div class="empty-state">
+            <p>Selecione a OLT e clique em atualizar</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script src="{% static 'script/noc/config.js' %}"></script>
+<script src="{% static 'script/noc/ui.js' %}"></script>
+<script src="{% static 'script/noc/parsers.js' %}"></script>
+<script src="{% static 'script/noc/pages.js' %}"></script>
+<script src="{% static 'script/noc.js' %}"></script>
+<script>document.addEventListener('DOMContentLoaded', () => markActive('delete'));</script>
+</body>
+</html>
